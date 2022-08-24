@@ -1,6 +1,7 @@
 Lamda = 1
 NameConst = 2
 QuoteConst = 3
+ListConst = 4
 
 
 class sExpression:

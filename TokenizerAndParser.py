@@ -51,10 +51,10 @@ def pureMS(specificString):
     return MS(specificString).wrap(ignore)
 
 
-def SExpressionCombinator():
+def ListCombinator():
     return pureMS("[") \
         .thenLazy(lambda:
-                  SExpressionCombinator()
+                  ListCombinator()
                   .OR(Atom)
                   .many()) \
         .then(pureMS("]")) \
@@ -63,7 +63,7 @@ def SExpressionCombinator():
         .mapResult(lambda x: [x])
 
 
-parseAll = SOF.then(SExpressionCombinator().many()).then(EOF)
+parseAll = SOF.then(ListCombinator().many()).then(EOF)
 
 
 def tokenizeParse(text):

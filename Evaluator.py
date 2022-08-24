@@ -1,4 +1,4 @@
-from classes import Scope, Lambda, Name, sExpression, NameConst, Value, QuoteConst
+from classes import Scope, Lambda, Name, sExpression, NameConst, Value, QuoteConst, ListConst
 
 macros = {}
 
@@ -105,17 +105,28 @@ def isSpecialFormKeyword(expression, scope) -> bool:
     #if reserved word, true
     ThrowAnError("Not implemented")
 
-def UnquoteOne(expression):
+def ASTtoData(expression):
     if expression.issExpression:
-        return expression.map(UnquoteOne)
-    if expression.kind == Lambda:
-        return expression.map(UnquoteOne)
-    if expression.kind == QuoteConst:
-        return expression.value
-    return expression
+        #s expression becomes itself in list presentation
+        return Value([ASTtoData(x) for x in expression.children], ListConst)
+    if expression.kind == NameConst:
+        #quote names
+        return Value(expression.value, QuoteConst)
+    return expression  # anything else is passed along as is (shouldnt really be anything?)
+    # note for compiler: in a compiler you would keep everything in list&quote&literal form,
+    # then when encountering a macro, compile the macro and pass the code to it, returning a new list-quote-literal form
+    # which you would then put in place. This avoids having to deal with complex function types and captured scope,
+    # in the interpreter this shouldn't ever be an issue since you pass compiled constructs like lambdas to this code
+    # macros may return captured functions from inside the macro, but
 
-def Unquote(expressionList):
-    [UnquoteOne(x) for x in expressionList]
+def DatatoAST(expression):
+    if expression.kind == ListConst:
+        #list to s expression
+        return sExpression([DatatoAST(x) for x in expression.value])
+    if expression.kind == QuoteConst:
+        #unquote name
+        return Value(expression.value, NameConst)
+    return expression  # anything else is passed along as is
 
 def MacroExpand(foundMacro, expressionList):
     #macros return a quoted list
@@ -123,13 +134,13 @@ def MacroExpand(foundMacro, expressionList):
 
     #bind all the lambda args with the code, quoted
     for i in range(foundMacro.bindingsLeft()):
-        foundMacro = foundMacro.bind(Value(expressionList[0], QuoteConst))
+        foundMacro = foundMacro.bind(ASTtoData(expressionList[0]))
         expressionList = expressionList[1:]
 
     #execute it, macro returns a list of symbols, some quoted, some values
     executedMacro = EvalLambda(foundMacro)
     #unquote once
-    executedMacro = Unquote(executedMacro)
+    executedMacro = DatatoAST(executedMacro)
     #insert back into place of the macro
     return executedMacro + expressionList
 
