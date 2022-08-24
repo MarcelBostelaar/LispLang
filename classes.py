@@ -1,87 +1,128 @@
-Lamda = 1
-NameConst = 2
-QuoteConst = 3
-ListConst = 4
+from enum import Enum
 
 
-class sExpression:
-    def __init__(self, children):
-        self.issExpression = True
-        self.children = children
-
-    def map(self, f):
-        return sExpression([f(x) for x in self.children])
-
-
-class Name:
-    def __init__(self, name):
-        self.issExpression = False
-        self.kind = NameConst
-        self.name = name
-
-    def toString(self):
-        return self.name
+class Kind(Enum):
+    Lambda = 1
+    Reference = 2
+    QuotedName = 3
+    List = 4
+    sExpression = 5
+    String = 6
 
 
 class Value:
-    def __init__(self, value, kind):
-        self.issExpression = False
+    """Abstract class for any value, must be subtyped"""
+    def __init__(self, value, kind: Kind):
+        self.__value__ = value
         self.kind = kind
-        self.value = value
 
-    def toString(self):
-        return '"' + self.value + '"'
+    def serialize(self):
+        raise Exception("Cannot serialise a " + self.kind.name)
+
+    def isSerializable(self):
+        return False
 
 
-class Lambda:
-    def __init__(self, bindings, body, currentScope, bindIndex=0):
+class List(Value):
+    """Represents a list of values"""
+    def __init__(self, value):
+        super().__init__(value, Kind.List)
+
+    def serialize(self):
+        return "[ " + " ".join([x.serialize() for x in self.__value__]) + " ]"
+
+    def isSerializable(self):
+        for i in self.__value__:
+            if not i.isSerializable():
+                return False
+        return True
+
+
+class QuotedName(Value):
+    """Represent a quoted name, an unevaluated reference name, for use mostly in macros"""
+    def __init__(self, value):
+        super().__init__(value, Kind.QuotedName)
+
+    def serialize(self):
+        return self.__value__
+
+    def isSerializable(self):
+        return True
+
+
+def __escape_string__(string):
+    print("TODO implement string escaping")  # todo
+    return string
+
+
+class String(Value):
+    def __init__(self, value, kind):
+        super().__init__(value, kind)
+
+    def serialize(self):
+        return '"' + __escape_string__(self.__value__) + '"'
+
+    def isSerializable(self):
+        return True
+
+
+# classes above may be used inside the language as data
+# beyond this are interpreter only types, such as lambda types, reference types, etc.
+
+
+class sExpression(Value):
+    """A piece of lisp code being evaluated"""
+    def __init__(self, value):
+        super().__init__(value, Kind.sExpression)
+
+
+class Reference(Value):
+    """Represents a named reference that needs to be evaluated"""
+    def __init__(self, value):
+        super().__init__(value, Kind.Reference)
+
+
+class Lambda(Value):
+    """In memory representation of a function"""
+    def __init__(self, bindings, body, currentScope, currentMacroScope, bindIndex=0):
+        super().__init__(None, Kind.Lambda)
         self.issExpression = False
-        self.kind = Lambda
 
-        self.bindings = bindings
-        self.body = body
-        self.boundScope = Scope(currentScope)
-        self.bindIndex = bindIndex
+        self.bindings = bindings  # function arguments
+        self.body = body  # the code to execute
+        # Contains its own scope, equal to the scope captured at creation
+        self.boundScope = currentScope.newChild()
+        self.boundMacroScope = currentMacroScope.newChild()
+        self.bindIndex = bindIndex  # index of the arg that will bind next
 
     def bindIsFinished(self):
-        return self.boundScope.countValues() == self.bindIndex + 1
+        return self.boundScope.countValues() == self.bindIndex
 
     def bind(self, variable):
         if self.bindIsFinished():
             raise Exception("Binding fully bound lambda (engine error?)")
         newscope = self.boundScope.addValue(self.bindings[self.bindIndex], variable)
-        return Lambda(self.bindings, self.body, newscope, self.bindIndex + 1)
+        return Lambda(self.bindings, self.body, newscope, self.boundMacroScope, self.bindIndex + 1)
 
     def bindingsLeft(self):
         return len(self.bindings) - self.boundScope.countValues()
 
-    def map(self, f):
-        return Lambda(self.bindings, f(self.body), self.boundScope.Map(f), self.bindIndex)
-
 
 class Scope:
-    def __init__(self, parent, startValues=None, startMacros=None):
+    """A construct containing the currently accessible references"""
+    def __init__(self, parent, startValues=None):
         if startValues is None:
             startValues = {}
-        if startMacros is None:
-            startMacros = {}
+        # currently scoped variables
         self.__values__ = startValues
-        self.__macros__ = startMacros
-        self.__parent__ = parent
+        self.__parent__ = parent  # the scope in which this scope is located, and thus is also accessible
 
     def addValue(self, name, value):
         if name in self.__values__.keys():
             raise Exception("Overwriting variables in the same scope is not allowed")
         copy = self.__values__.copy()
         copy[name] = value
-        return Scope(self.__parent__, startValues=copy, startMacros=self.__macros__)
-
-    def addMacro(self, macroname, lambdaValue):
-        if macroname in self.__values__.keys():
-            raise Exception("Overwriting macros in the same scope is not allowed")
-        copy = self.__macros__.copy()
-        copy[macroname] = lambdaValue
-        return Scope(self.__parent__, startValues=self.__values__, startMacros=copy)
+        return Scope(self.__parent__, copy)
 
     def retrieveValue(self, name):
         if name in self.__values__.keys():
@@ -97,17 +138,3 @@ class Scope:
 
     def newChild(self):
         return Scope(self)
-
-    def OnlyMacrosCopy(self):
-        parent = None
-        if self.__parent__ is not None:
-            parent = self.__parent__.OnlyMacrosCopy()
-        return Scope(parent, startMacros=self.__macros__)
-
-    def Map(self, f):
-        newValues = {k: f(v) for k, v in self.__values__.items()}
-        newMacros = {k: f(v) for k, v in self.__macros__.items()}
-        parent = None
-        if self.__parent__ is not None:
-            parent = self.__parent__.Map(f)
-        return Scope(parent, startValues=newValues, startMacros=newMacros)

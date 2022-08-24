@@ -111,7 +111,7 @@ def ASTtoData(expression):
         return Value([ASTtoData(x) for x in expression.children], ListConst)
     if expression.kind == NameConst:
         #quote names
-        return Value(expression.value, QuoteConst)
+        return Value(expression.__value__, QuoteConst)
     return expression  # anything else is passed along as is (shouldnt really be anything?)
     # note for compiler: in a compiler you would keep everything in list&quote&literal form,
     # then when encountering a macro, compile the macro and pass the code to it, returning a new list-quote-literal form
@@ -122,10 +122,10 @@ def ASTtoData(expression):
 def DatatoAST(expression):
     if expression.kind == ListConst:
         #list to s expression
-        return sExpression([DatatoAST(x) for x in expression.value])
+        return sExpression([DatatoAST(x) for x in expression.__value__])
     if expression.kind == QuoteConst:
         #unquote name
-        return Value(expression.value, NameConst)
+        return Value(expression.__value__, NameConst)
     return expression  # anything else is passed along as is
 
 def MacroExpand(foundMacro, expressionList):

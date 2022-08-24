@@ -1,0 +1,12 @@
+
+lists, literals and quoted names = LLQ
+
+Rewrite parser combinator to only LLQ
+
+Rework eval function to take LLQ and turn it into s-Expressions
+
+Rework macro expand to not do double translations
+In macro expand, check that return value of the macro function is an LLQ (it must be serializable)
+
+Macro expand >should< have access to the defined functions in the scope its created in. (?)
+That way you can easily use macros to do things?
