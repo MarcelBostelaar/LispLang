@@ -1,11 +1,17 @@
-from Tokenizer import flatten
+from Parser import parseAll
+from Tokenizer import flatten, tokenizeFull
 
 ##if else is lazy
 #macro is lazy
 #rest is not lazy
 
 from TokenizerAndParser import *
-from classes import Scope, Lambda, Name, sExpression
+from classes import Scope, Lambda, sExpression
+
+
+def tokenizeParse(text):
+    tokenized = tokenizeFull(text, [*"/[]`,;()*<>\\ \"\t\r\n"])
+    return parseAll.parse(tokenized)
 
 def printSExpressions(expressions):
     if type(expressions) is list:

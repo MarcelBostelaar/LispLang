@@ -8,6 +8,7 @@ class Kind(Enum):
     List = 4
     sExpression = 5
     String = 6
+    IgnoredValue = 7
 
 
 class Value:
@@ -56,8 +57,8 @@ def __escape_string__(string):
 
 
 class String(Value):
-    def __init__(self, value, kind):
-        super().__init__(value, kind)
+    def __init__(self, value):
+        super().__init__(value, Kind.String)
 
     def serialize(self):
         return '"' + __escape_string__(self.__value__) + '"'
@@ -76,6 +77,15 @@ class sExpression(Value):
         super().__init__(value, Kind.sExpression)
 
 
+class IgnoredValueClass(Value):
+    """A class to represent a value that was ignored. Ignored values at the start of an s expression are removed."""
+    def __init__(self):
+        super().__init__(None, Kind.IgnoredValue)
+
+
+IgnoredValue = IgnoredValueClass()
+
+
 class Reference(Value):
     """Represents a named reference that needs to be evaluated"""
     def __init__(self, value):
@@ -84,7 +94,7 @@ class Reference(Value):
 
 class Lambda(Value):
     """In memory representation of a function"""
-    def __init__(self, bindings, body, currentScope, currentMacroScope, bindIndex=0):
+    def __init__(self, bindings, body, currentScope, bindIndex=0):
         super().__init__(None, Kind.Lambda)
         self.issExpression = False
 
@@ -92,7 +102,6 @@ class Lambda(Value):
         self.body = body  # the code to execute
         # Contains its own scope, equal to the scope captured at creation
         self.boundScope = currentScope.newChild()
-        self.boundMacroScope = currentMacroScope.newChild()
         self.bindIndex = bindIndex  # index of the arg that will bind next
 
     def bindIsFinished(self):
@@ -102,10 +111,20 @@ class Lambda(Value):
         if self.bindIsFinished():
             raise Exception("Binding fully bound lambda (engine error?)")
         newscope = self.boundScope.addValue(self.bindings[self.bindIndex], variable)
-        return Lambda(self.bindings, self.body, newscope, self.boundMacroScope, self.bindIndex + 1)
+        return Lambda(self.bindings, self.body, newscope, self.bindIndex + 1)
 
     def bindingsLeft(self):
         return len(self.bindings) - self.boundScope.countValues()
+
+    def run(self, runFunc):
+        """
+        Returns an evaluated form of itself if its fully bound, return self if not fully bound
+        :param runFunc: Eval func of (expression, scope) -> expression
+        :return:
+        """
+        if self.bindIsFinished():
+            return runFunc(self.body, self.boundScope)
+        return self
 
 
 class Scope:
@@ -130,6 +149,13 @@ class Scope:
         if self.__parent__ is not None:
             return self.__parent__.retrieveValue(name)
         raise Exception("Unknown variable")
+
+    def hasValue(self, name):
+        if name in self.__values__.keys():
+            return True
+        if self.__parent__ is not None:
+            return self.__parent__.hasValue(name)
+        return False
 
     def countValues(self):
         if self.__parent__ is not None:

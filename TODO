@@ -5,6 +5,16 @@ Rewrite parser combinator to only LLQ
 
 Rework eval function to take LLQ and turn it into s-Expressions
 
+two components, executor of demacroed code, and macro expander
+macro expander gets a scope
+
+    Rewrite to incremental compiler
+    Macroexpand next expression,
+        if its a let or macro statement,
+            save its unevaluated form to the compiled output,
+            save to the scope
+        if its not, save it to the unevaluated form
+
 Rework macro expand to not do double translations
 In macro expand, check that return value of the macro function is an LLQ (it must be serializable)
 

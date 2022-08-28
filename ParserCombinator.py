@@ -9,10 +9,9 @@ class parseResult:
             self.content = f(self.content)
 
 
-
 class Combinator:
-    # f takes a function that accepts a list of tokens and returns a parseResult
-    def __init__(self, f, debugMessage = None):
+    """f takes a function that accepts a list of tokens and returns a parseResult"""
+    def __init__(self, f, debugMessage=None):
         self.f = f
         self.debugMessage = debugMessage
 
@@ -20,7 +19,7 @@ class Combinator:
         result = self.f(tokens)
         if self.debugMessage is not None:
             print(self.debugMessage)
-            if(result.isSucces):
+            if result.isSucces:
                 print("success, parsed:")
                 print(result.content)
                 print("remainder:")
@@ -62,18 +61,22 @@ class Combinator:
             return result2
         return Combinator(internal)
 
-    #matched 0 or more of itself
-    def many(self):
+    def many(self, minimum):
+        """Makes the parser combinator match N or more of itself"""
         def internal(tokens):
             accumulate = parseResult(True, [], tokens)
             result = parseResult(True, [], tokens)
+            totalMatched = -1
             while result.isSucces:
+                totalMatched += 1
                 accumulate = parseResult(True,
                                          accumulate.content + result.content,
                                          result.remaining)
                 result = self.parse(accumulate.remaining)
-
-            return accumulate
+            if totalMatched >= minimum:
+                return accumulate
+            else:
+                parseResult(False, accumulate.content, accumulate.remaining)
         return Combinator(internal)
 
     def ignore(self):
@@ -83,6 +86,7 @@ class Combinator:
         return otherCombinator.then(self).then(otherCombinator)
 
     def mustFailThenTry(self, otherCombinator):
+        """Executes otherCombinator if this combinator fails to parse"""
         def internal(tokens):
             result = self.parse(tokens)
             if result.isSucces:
@@ -98,9 +102,8 @@ class Combinator:
         return Combinator(internal)
 
 
-
-# matchstring
 def MS(specificString):
+    """Match string"""
     def internal(tokens):
         if(len(tokens) > 0):
             if(tokens[0] == specificString):
@@ -110,7 +113,7 @@ def MS(specificString):
 
 
 def AnyFunc(tokens):
-    if(len(tokens) > 0):
+    if len(tokens) > 0:
         return parseResult(True, [tokens[0]], tokens[1:])
     print("EOF")
     return parseResult(False, None, tokens)

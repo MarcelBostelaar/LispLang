@@ -1,175 +1,151 @@
-from classes import Scope, Lambda, Name, sExpression, NameConst, Value, QuoteConst, ListConst
+from classes import Scope, Lambda, sExpression, Value, Kind, Reference, IgnoredValue
 
-macros = {}
-
+"""Only operates on demacroed code"""
 
 def stringify(sExpression):
     return "Error stringification not implemented"
-
 
 def ThrowAnError(message, currentExpression=None):
     if currentExpression is None:
         raise Exception(message)
     raise Exception(message + "\nLine: " + stringify(currentExpression))
 
-
-def defineMacro(name, input, transformation):
-    if name in macros.keys():
-        raise Exception("Cant redefine macros")
-    macros[name] = [input, transformation]
-
 def EvalLambda(lambdaValue):
     return Eval(lambdaValue.body, lambdaValue.boundScope)
 
-def Eval(expression, scope):
+
+def toAST(LLQ):
+    """
+    Takes an LLQ and turns it into the interpreter representation of executable AST
+    :param LLQ: List, Literal, Quoted names AST
+    :return: The AST as s-expressions and unquoted names
+    """
+    if LLQ.kind == Kind.List:
+        return sExpression([toAST(x) for x in LLQ.value])
+    if LLQ.kind == Kind.QuotedName:
+        return Reference(LLQ.value)
+    return LLQ
+
+
+def Eval(expression, currentScope):
+    """
+    Evaluates a piece of interpreter representational code
+    :param expression: s Expression and/or value
+    :param currentScope: Currently scoped variables and their values
+    :return: Return value of the calculation
+    """
     # continue statements used to achieve tail call optimisation, and to keep stack usage to a minimum
-
-    # if 0 children, error, cant execute
-    # if 1 child, extract child, restart loop
-
-    # two or more
-    # if first arg is reserved word, expand statement, restart loop
-    ## if first arg is ignore, remove it, restart loop
-    # if first arg is a name, retrieve value from scope, restart loop
-    # if first arg is an s expression, evaluate it recursively with new scope
-    # if first arg is a lambda,
-        #lambda code
-
     while True:
-        if len(expression.children) == 0:
-            ThrowAnError("Tried to evaluate an empty list")
-        if len(expression.children) == 1:
-            if expression.children[0].issExpression:
-                expression = expression[0]
-                continue  # tail call
-            return expression.children[0]
+        # if not an s expression (such as a literal) -> return self
+        if expression.kind != Kind.sExpression:
+            return expression
 
-        if isSpecialFormKeyword(expression, scope):
-            #expand special form, returns new expression and changed scope
-            [expression, scope] = ExpandSpecialForm(expression, scope)
+        ##its an s expression
+        # if 0 children, error, cant execute
+        # if 1 child, extract child, restart loop
+        if len(expression.value) == 0:
+            ThrowAnError("Cant evaluate an s expression with 0 items in it")
+        if len(expression.value) == 1:
+            expression = expression.value[0]
             continue
 
-        first = expression.children[0]
-        tail = expression.children[1:]
+        ## two or more
+        # if head if reference (a name)
+            # if head is reference in scope, replace with its value from scope
+            # (dereferencing is done before special forms to allow scoped overrides of special forms.
+            # This makes special forms undistinct from macro forms from a user perspective,
+            # which can also be scoped overridden)
+            # if head is reference of special form, execute it via special form execution, continue
+        # if head is ignoredValue, restart eval with tail
+        # if head is s expression, replace head with Eval(head), restart loop
+        # if head is lambda,
+        #   apply Eval(second arg) to it,
+        #   check if its fully bound,
+        #       eval and replace if so,
+        #   restart loop
+        # if head is anything else, cant be applied, error
 
-        if first.type == NameConst:
-            # extract value from scope
-            expression = sExpression([scope.retrieveValue(first.name)] + tail)
-            continue
+        head = expression.value[0]
+        tail = expression.value[1:]
 
-        if first.issExpression:
-            #evaluate first arg in place
-            first = Eval(first, scope.newChild())
-            expression = sExpression([first] + tail)
-            continue
-
-        if first.type == Lambda:
-            second = tail[0]
-            # if second arg is special, expand tail, restart loop
-            if isSpecialFormKeyword(second, scope):
-                [tail, scope] = ExpandSpecialForm(tail, scope)
-                expression = sExpression([first] + tail)
+        if head.kind == Kind.Reference:
+            if currentScope.hasValue(head.value):
+                head = currentScope.retrieveValue(head.value)
+                expression = sExpression([head] + tail)
                 continue
-            else:
-                # eval second arg on its own
-                tailtail = tail[1:]
-                second = Eval(second, scope.newChild())
-                # apply second arg
-                first = first.bind(second)
-
-                # if lambda finished binding, eval it with its bound scope
-                    # put result in place of lambda
-                if first.bindIsFinished():
-                    if len(tailtail) == 0:
-                        #no more arguments after this, tail call optimize
-                        expression = sExpression(first.body)
-                        scope = first.boundScope
-                        continue #tail call optimization
-                    else:
-                        #still some more code in this scope, evaluate recursively with bound lambda scope
-                        first = EvalLambda(first)
-                        expression = sExpression([first] + tailtail)
-                        continue
-                #lambda isn't finished binding, do not execute yet
-                expression = sExpression([first] + tailtail)
+            if isSpecialFormKeyword(head.value):
+                [expression, currentScope] = ExecuteSpecialForm(expression, currentScope)
                 continue
+            ThrowAnError("Could not find reference " + head.value + ".", expression)
 
-        else:
-            ThrowAnError("Cannot apply arguments to this type", expression)
+        if head.kind == Kind.IgnoredValue:
+            expression = sExpression(tail)
+            continue
 
-def findMacroPattern(expression, scope) -> Lambda:
-    ThrowAnError("Not implemented")
+        if head.kind == Kind.sExpression:
+            expression = sExpression([Eval(head.value, currentScope.newChild())] + tail)
+            continue
 
-def isSpecialFormKeyword(expression, scope) -> bool:
-    #if macro pattern in scope, true
-    #if reserved word, true
-    ThrowAnError("Not implemented")
+        if head.kind == Kind.Lambda:
+            val: Lambda = head.value
+            #   apply Eval(second arg) to it,
+            #   check if its fully bound,
+            #       eval and replace if so,
+            #   restart loop
+            tailhead = tail[0]
+            truetail = tail[1:]
+            applied = val\
+                .bind(Eval(tailhead, currentScope.newChild()))\
+                .run(Eval)
+            expression = sExpression([applied] + truetail)
+            pass
 
-def ASTtoData(expression):
-    if expression.issExpression:
-        #s expression becomes itself in list presentation
-        return Value([ASTtoData(x) for x in expression.children], ListConst)
-    if expression.kind == NameConst:
-        #quote names
-        return Value(expression.__value__, QuoteConst)
-    return expression  # anything else is passed along as is (shouldnt really be anything?)
-    # note for compiler: in a compiler you would keep everything in list&quote&literal form,
-    # then when encountering a macro, compile the macro and pass the code to it, returning a new list-quote-literal form
-    # which you would then put in place. This avoids having to deal with complex function types and captured scope,
-    # in the interpreter this shouldn't ever be an issue since you pass compiled constructs like lambdas to this code
-    # macros may return captured functions from inside the macro, but
-
-def DatatoAST(expression):
-    if expression.kind == ListConst:
-        #list to s expression
-        return sExpression([DatatoAST(x) for x in expression.__value__])
-    if expression.kind == QuoteConst:
-        #unquote name
-        return Value(expression.__value__, NameConst)
-    return expression  # anything else is passed along as is
-
-def MacroExpand(foundMacro, expressionList):
-    #macros return a quoted list
-    #the macro itself should be replaced with the *contents* of the list, so without any brackets
-
-    #bind all the lambda args with the code, quoted
-    for i in range(foundMacro.bindingsLeft()):
-        foundMacro = foundMacro.bind(ASTtoData(expressionList[0]))
-        expressionList = expressionList[1:]
-
-    #execute it, macro returns a list of symbols, some quoted, some values
-    executedMacro = EvalLambda(foundMacro)
-    #unquote once
-    executedMacro = DatatoAST(executedMacro)
-    #insert back into place of the macro
-    return executedMacro + expressionList
+        # All other options are wrong
+        ThrowAnError("Cannot apply an argument to value at head.", expression)
 
 
-def ExceptionIfNoExecutableCode(expressionList, itemBefore, original):
-    if len(expressionList) == 0:
-        ThrowAnError("Defined a " + itemBefore + " and no executable code after, illegal code", original)
+def isSpecialFormKeyword(name) -> bool:
+    return name in ["lambda", "let"]
 
-def ExpandSpecialForm(expressionList, scope: Scope) -> [sExpression, Scope]:
-    foundMacro = findMacroPattern(expressionList, scope)
-    if foundMacro is not None:
-        return [sExpression(MacroExpand(foundMacro, expressionList)), scope]
+def MustHaveLength(expression, N):
+    if len(expression.value) < N:
+        ThrowAnError("Special form " + expression.value[0].value + " must have at least "
+                     + str(N) + " items arguments, only has " + str(len(expression.value)))
 
-    if (expressionList[0] == "macro"):
-        [_, macroname, input, transformation] = expressionList[:4]
-        scope = scope.addMacro(macroname, Lambda(input, transformation, scope.OnlyMacrosCopy()))
-        ExceptionIfNoExecutableCode(expressionList[4:], "macro", expressionList)
-        return [expressionList[4:], scope]
+def MustBeKind(expression, message: str, *kinds: [Kind]):
+    """
+    Error check for all allowed types of an expression
+    :param expression:
+    :param message:
+    :param kinds:
+    :return:
+    """
+    if expression.kind in kinds:
+        return
+    ThrowAnError(message + "\nIt has type " + expression.kind.name, expression)
 
-    elif (expressionList[0] == "lambda"):
-        [_, arguments, body] = expressionList[:3]
-        return [[Lambda(arguments, body, scope)] + expressionList[3:], scope]
 
-    elif (expressionList[0] == "let"):
-        [_, varname, value] = expressionList[:3]
-        value = Eval(value, scope)
-        scope = scope.addValue(varname, value)
-        ExceptionIfNoExecutableCode(expressionList[3:], "let", expressionList)
-        return [expressionList[3:], scope]
+def ExecuteSpecialForm(expression, currentScope):
+    name = expression.value[0].value
+    if name == "lambda":
+        MustHaveLength(expression, 3)
+        args = expression.value[1]
+        body = expression.value[2]
+        lambdaerr = "First arg after lambda must be a flat list/s expression of names"
+        MustBeKind(args, lambdaerr, Kind.sExpression,)
+        [MustBeKind(x, lambdaerr, Kind.Reference) for x in args.value]
+        MustBeKind(body, "Body of a lambda must be an s expression or a single name", Kind.sExpression, Kind.Reference)
 
-    else:
-        raise Exception("Unknown function")
+        tail = expression.value[3:]
+        return [sExpression([Lambda(args, body, currentScope)] + tail), currentScope]
+
+    if name == "let":
+        MustHaveLength(expression, 3)
+        name = expression.value[1]
+        value = Eval(expression.value[2], currentScope)
+        MustBeKind(name, "The first arg after a let must be a name", Kind.Reference)
+        newScope = currentScope.addValue(name.value, value)
+        tail = expression.value[3:]
+        return [sExpression([IgnoredValue()] + tail), newScope]
+
+    ThrowAnError("Unknown special form (engine bug)", expression)
