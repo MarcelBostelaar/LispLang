@@ -2,16 +2,15 @@ from classes import Scope, Lambda, sExpression, Value, Kind, Reference, IgnoredV
 
 """Only operates on demacroed code"""
 
+
 def stringify(sExpression):
     return "Error stringification not implemented"
+
 
 def ThrowAnError(message, currentExpression=None):
     if currentExpression is None:
         raise Exception(message)
     raise Exception(message + "\nLine: " + stringify(currentExpression))
-
-def EvalLambda(lambdaValue):
-    return Eval(lambdaValue.body, lambdaValue.boundScope)
 
 
 def toAST(LLQ):
@@ -25,6 +24,24 @@ def toAST(LLQ):
     if LLQ.kind == Kind.QuotedName:
         return Reference(LLQ.value)
     return LLQ
+
+
+def EvalLambda(expression, currentScope):
+    head = expression.value[0]
+    tail = expression.value[1:]
+    val: Lambda = head.value
+    #   apply Eval(second arg) to it,
+    #   check if its fully bound,
+    #       eval and replace if so,
+    #   restart loop
+    tailhead = tail[0]
+    truetail = tail[1:]
+    applied = val \
+        .bind(Eval(tailhead, currentScope.newChild())) \
+        .run(Eval)
+    expression = sExpression([applied] + truetail)
+    return [expression, currentScope]
+
 
 
 def Eval(expression, currentScope):
@@ -51,11 +68,11 @@ def Eval(expression, currentScope):
 
         ## two or more
         # if head if reference (a name)
-            # if head is reference in scope, replace with its value from scope
-            # (dereferencing is done before special forms to allow scoped overrides of special forms.
-            # This makes special forms undistinct from macro forms from a user perspective,
-            # which can also be scoped overridden)
-            # if head is reference of special form, execute it via special form execution, continue
+        # if head is reference in scope, replace with its value from scope
+        # (dereferencing is done before special forms to allow scoped overrides of special forms.
+        # This makes special forms undistinct from macro forms from a user perspective,
+        # which can also be scoped overridden)
+        # if head is reference of special form, execute it via special form execution, continue
         # if head is ignoredValue, restart eval with tail
         # if head is s expression, replace head with Eval(head), restart loop
         # if head is lambda,
@@ -87,18 +104,8 @@ def Eval(expression, currentScope):
             continue
 
         if head.kind == Kind.Lambda:
-            val: Lambda = head.value
-            #   apply Eval(second arg) to it,
-            #   check if its fully bound,
-            #       eval and replace if so,
-            #   restart loop
-            tailhead = tail[0]
-            truetail = tail[1:]
-            applied = val\
-                .bind(Eval(tailhead, currentScope.newChild()))\
-                .run(Eval)
-            expression = sExpression([applied] + truetail)
-            pass
+            [expression, currentScope] = EvalLambda(expression, currentScope)
+            continue
 
         # All other options are wrong
         ThrowAnError("Cannot apply an argument to value at head.", expression)
@@ -107,10 +114,12 @@ def Eval(expression, currentScope):
 def isSpecialFormKeyword(name) -> bool:
     return name in ["lambda", "let"]
 
+
 def MustHaveLength(expression, N):
     if len(expression.value) < N:
         ThrowAnError("Special form " + expression.value[0].value + " must have at least "
                      + str(N) + " items arguments, only has " + str(len(expression.value)))
+
 
 def MustBeKind(expression, message: str, *kinds: [Kind]):
     """
@@ -132,7 +141,7 @@ def ExecuteSpecialForm(expression, currentScope):
         args = expression.value[1]
         body = expression.value[2]
         lambdaerr = "First arg after lambda must be a flat list/s expression of names"
-        MustBeKind(args, lambdaerr, Kind.sExpression,)
+        MustBeKind(args, lambdaerr, Kind.sExpression, )
         [MustBeKind(x, lambdaerr, Kind.Reference) for x in args.value]
         MustBeKind(body, "Body of a lambda must be an s expression or a single name", Kind.sExpression, Kind.Reference)
 
