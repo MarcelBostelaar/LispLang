@@ -14,7 +14,7 @@ class Kind(Enum):
 class Value:
     """Abstract class for any value, must be subtyped"""
     def __init__(self, value, kind: Kind):
-        self.__value__ = value
+        self.value = value
         self.kind = kind
 
     def serialize(self):
@@ -30,10 +30,10 @@ class List(Value):
         super().__init__(value, Kind.List)
 
     def serialize(self):
-        return "[ " + " ".join([x.serialize() for x in self.__value__]) + " ]"
+        return "[ " + " ".join([x.serialize() for x in self.value]) + " ]"
 
     def isSerializable(self):
-        for i in self.__value__:
+        for i in self.value:
             if not i.isSerializable():
                 return False
         return True
@@ -45,7 +45,7 @@ class QuotedName(Value):
         super().__init__(value, Kind.QuotedName)
 
     def serialize(self):
-        return self.__value__
+        return self.value
 
     def isSerializable(self):
         return True
@@ -61,7 +61,7 @@ class String(Value):
         super().__init__(value, Kind.String)
 
     def serialize(self):
-        return '"' + __escape_string__(self.__value__) + '"'
+        return '"' + __escape_string__(self.value) + '"'
 
     def isSerializable(self):
         return True
@@ -101,11 +101,11 @@ class Lambda(Value):
         self.bindings = bindings  # function arguments
         self.body = body  # the code to execute
         # Contains its own scope, equal to the scope captured at creation
-        self.boundScope = currentScope.newChild()
+        self.boundScope = currentScope
         self.bindIndex = bindIndex  # index of the arg that will bind next
 
     def bindIsFinished(self):
-        return self.boundScope.countValues() == self.bindIndex
+        return self.boundScope.countValues() == len(self.bindings)
 
     def bind(self, variable):
         if self.bindIsFinished():
@@ -164,3 +164,6 @@ class Scope:
 
     def newChild(self):
         return Scope(self)
+
+    def __repr__(self) -> str:
+        return f"Scope({self.__values__}, {self.__parent__})"

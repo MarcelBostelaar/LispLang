@@ -29,20 +29,32 @@ def toAST(LLQ):
 def EvalLambda(expression, currentScope):
     head = expression.value[0]
     tail = expression.value[1:]
-    val: Lambda = head.value
     #   apply Eval(second arg) to it,
     #   check if its fully bound,
     #       eval and replace if so,
     #   restart loop
     tailhead = tail[0]
     truetail = tail[1:]
-    applied = val \
-        .bind(Eval(tailhead, currentScope.newChild())) \
+    evaluated = Eval(tailhead, currentScope.newChild())
+    applied = head \
+        .bind(evaluated) \
         .run(Eval)
     expression = sExpression([applied] + truetail)
     return [expression, currentScope]
 
 
+def Dereference(expression, currentScope):
+    head = expression.value[0]
+    tail = expression.value[1:]
+
+    if currentScope.hasValue(head.value):
+        head = currentScope.retrieveValue(head.value)
+        expression = sExpression([head] + tail)
+        return [expression, currentScope]
+    if isSpecialFormKeyword(head.value):
+        return ExecuteSpecialForm(expression, currentScope)
+
+    ThrowAnError("Could not find reference " + head.value + ".", expression)
 
 def Eval(expression, currentScope):
     """
@@ -53,8 +65,10 @@ def Eval(expression, currentScope):
     """
     # continue statements used to achieve tail call optimisation, and to keep stack usage to a minimum
     while True:
-        # if not an s expression (such as a literal) -> return self
         if expression.kind != Kind.sExpression:
+            if expression.kind == Kind.Reference:
+                [expression, currentScope] = Dereference(sExpression([expression]), currentScope)
+                continue
             return expression
 
         ##its an s expression
@@ -64,6 +78,7 @@ def Eval(expression, currentScope):
             ThrowAnError("Cant evaluate an s expression with 0 items in it")
         if len(expression.value) == 1:
             expression = expression.value[0]
+            currentScope = currentScope.newChild()
             continue
 
         ## two or more
@@ -86,14 +101,8 @@ def Eval(expression, currentScope):
         tail = expression.value[1:]
 
         if head.kind == Kind.Reference:
-            if currentScope.hasValue(head.value):
-                head = currentScope.retrieveValue(head.value)
-                expression = sExpression([head] + tail)
-                continue
-            if isSpecialFormKeyword(head.value):
-                [expression, currentScope] = ExecuteSpecialForm(expression, currentScope)
-                continue
-            ThrowAnError("Could not find reference " + head.value + ".", expression)
+            [expression, currentScope] = Dereference(expression, currentScope)
+            continue
 
         if head.kind == Kind.IgnoredValue:
             expression = sExpression(tail)
@@ -146,7 +155,7 @@ def ExecuteSpecialForm(expression, currentScope):
         MustBeKind(body, "Body of a lambda must be an s expression or a single name", Kind.sExpression, Kind.Reference)
 
         tail = expression.value[3:]
-        return [sExpression([Lambda(args, body, currentScope)] + tail), currentScope]
+        return [sExpression([Lambda([z.value for z in args.value], body, currentScope.newChild())] + tail), currentScope]
 
     if name == "let":
         MustHaveLength(expression, 3)
@@ -155,6 +164,6 @@ def ExecuteSpecialForm(expression, currentScope):
         MustBeKind(name, "The first arg after a let must be a name", Kind.Reference)
         newScope = currentScope.addValue(name.value, value)
         tail = expression.value[3:]
-        return [sExpression([IgnoredValue()] + tail), newScope]
+        return [sExpression([IgnoredValue] + tail), newScope]
 
     ThrowAnError("Unknown special form (engine bug)", expression)

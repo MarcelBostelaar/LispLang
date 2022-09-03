@@ -115,7 +115,7 @@ def MS(specificString):
 def AnyFunc(tokens):
     if len(tokens) > 0:
         return parseResult(True, [tokens[0]], tokens[1:])
-    print("EOF")
+    # EOF
     return parseResult(False, None, tokens)
 
 

@@ -41,7 +41,7 @@ string = MS("\"").ignore()\
 inlineValues = string  # todo numbers and other literals
 
 """Any non-ignorable item that isn't an opening or closing bracket"""
-Atom = MS("[").OR(MS("]"))\
+Atom = MS("[").OR(MS("]")).OR(SOF).OR(EOF)\
     .mustFailThenTry(
         inlineValues  # inline literals such as strings and numbers
         .OR(  # everything else that has been tokenized
@@ -72,4 +72,4 @@ def BracketedContent():
         .mapResult(lambda x: [x])
 
 
-parseAll = SOF.then(ProgramContent()).then(EOF)
+parseAll = SOF.then(ProgramContent()).then(EOF).mapResult(lambda x: List(x[1:-1]))
