@@ -9,6 +9,7 @@ class Kind(Enum):
     sExpression = 5
     String = 6
     IgnoredValue = 7
+    SpecialFunc = 8
 
 
 class Value:
@@ -90,6 +91,12 @@ class Reference(Value):
     """Represents a named reference that needs to be evaluated"""
     def __init__(self, value):
         super().__init__(value, Kind.Reference)
+
+
+class SpecialFunc(Value):
+    """Handles the application of the build in functions which may have special properties"""
+    def __init__(self, value):
+        super().__init__(value, Kind.SpecialFunc)
 
 
 class Lambda(Value):

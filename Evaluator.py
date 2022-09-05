@@ -1,4 +1,5 @@
-from classes import Scope, Lambda, sExpression, Value, Kind, Reference, IgnoredValue
+from classes import Scope, Lambda, sExpression, Value, Kind, Reference, IgnoredValue, List
+from langConfig import *
 
 """Only operates on demacroed code"""
 
@@ -33,7 +34,7 @@ def EvalLambda(expression, currentScope):
     #   check if its fully bound,
     #       eval and replace if so,
     #   restart loop
-    tailhead = tail[0]
+    tailhead = tail[0] # todo change so it gets the next valid value (special forms that follow it should be applied, to be in line with the workings of macros
     truetail = tail[1:]
     evaluated = Eval(tailhead, currentScope.newChild())
     applied = head \
@@ -55,6 +56,7 @@ def Dereference(expression, currentScope):
         return ExecuteSpecialForm(expression, currentScope)
 
     ThrowAnError("Could not find reference " + head.value + ".", expression)
+
 
 def Eval(expression, currentScope):
     """
@@ -121,7 +123,7 @@ def Eval(expression, currentScope):
 
 
 def isSpecialFormKeyword(name) -> bool:
-    return name in ["lambda", "let"]
+    return name in [lambdaKeyword, letKeyword, quoteKeyword]
 
 
 def MustHaveLength(expression, N):
@@ -143,9 +145,19 @@ def MustBeKind(expression, message: str, *kinds: [Kind]):
     ThrowAnError(message + "\nIt has type " + expression.kind.name, expression)
 
 
+def QuoteCode(expression):
+    print("TODO implement quoting")
+    #TODO implement
+    # if ref, -> quote
+    # if sexpression -> list
+    # recursive everything in it
+    # literals -> remain the same
+    return expression
+
+
 def ExecuteSpecialForm(expression, currentScope):
     name = expression.value[0].value
-    if name == "lambda":
+    if name == lambdaKeyword:
         MustHaveLength(expression, 3)
         args = expression.value[1]
         body = expression.value[2]
@@ -157,13 +169,28 @@ def ExecuteSpecialForm(expression, currentScope):
         tail = expression.value[3:]
         return [sExpression([Lambda([z.value for z in args.value], body, currentScope.newChild())] + tail), currentScope]
 
-    if name == "let":
+    if name == letKeyword:
         MustHaveLength(expression, 3)
         name = expression.value[1]
-        value = Eval(expression.value[2], currentScope)
+        value = Eval(expression.value[2], currentScope.newChild())
         MustBeKind(name, "The first arg after a let must be a name", Kind.Reference)
         newScope = currentScope.addValue(name.value, value)
         tail = expression.value[3:]
         return [sExpression([IgnoredValue] + tail), newScope]
+
+    if name == quoteKeyword:
+        #quotes item directly after it
+        MustHaveLength(expression, 2)
+        snd = expression.value[1]
+        tail = expression.value[2:]
+        newSnd = QuoteCode(snd)
+        return [[newSnd] + tail, currentScope]
+
+    if name == condKeyword:
+        MustHaveLength(expression, 4)
+        [_, condition, truePath, falsePath] = expression.value[:4]
+        tail = expression.value[4:]
+        evaluated = Eval(condition, currentScope.newChild())
+        #eval condition, if true, return true unevaluated, else return falsepath unevaluated
 
     ThrowAnError("Unknown special form (engine bug)", expression)
