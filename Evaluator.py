@@ -34,7 +34,7 @@ def EvalLambda(expression, currentScope):
     #   check if its fully bound,
     #       eval and replace if so,
     #   restart loop
-    tailhead = tail[0] # todo change so it gets the next valid value (special forms that follow it should be applied, to be in line with the workings of macros
+    tailhead = tail[0]
     truetail = tail[1:]
     evaluated = Eval(tailhead, currentScope.newChild())
     applied = head \
@@ -123,7 +123,7 @@ def Eval(expression, currentScope):
 
 
 def isSpecialFormKeyword(name) -> bool:
-    return name in [lambdaKeyword, letKeyword, quoteKeyword]
+    return name in [e.value.name for e in SpecialForms]
 
 
 def MustHaveLength(expression, N):
@@ -155,42 +155,50 @@ def QuoteCode(expression):
     return expression
 
 
+def SpecialFormSlicer(expression, formConfig: SpecialForms):
+    length = formConfig.value.length
+    MustHaveLength(expression, length)
+    return [expression.value[:length], expression.value[length:]]
+
+
 def ExecuteSpecialForm(expression, currentScope):
     name = expression.value[0].value
-    if name == lambdaKeyword:
-        MustHaveLength(expression, 3)
-        args = expression.value[1]
-        body = expression.value[2]
+    if name == SpecialForms.Lambda.value.keyword:
+        [[_, args, body], rest] = SpecialFormSlicer(expression, SpecialForms.Lambda)
         lambdaerr = "First arg after lambda must be a flat list/s expression of names"
         MustBeKind(args, lambdaerr, Kind.sExpression, )
         [MustBeKind(x, lambdaerr, Kind.Reference) for x in args.value]
         MustBeKind(body, "Body of a lambda must be an s expression or a single name", Kind.sExpression, Kind.Reference)
+        return [sExpression([Lambda([z.value for z in args.value], body, currentScope.newChild())] + rest), currentScope]
 
-        tail = expression.value[3:]
-        return [sExpression([Lambda([z.value for z in args.value], body, currentScope.newChild())] + tail), currentScope]
+    if name == SpecialForms.macro.value.keyword:
+        #ignore for this implementation, interpreter doesn't support eval yet
+        [_, rest] = SpecialFormSlicer(expression, SpecialForms.macro)
+        return [sExpression(rest), currentScope]
 
-    if name == letKeyword:
-        MustHaveLength(expression, 3)
-        name = expression.value[1]
-        value = Eval(expression.value[2], currentScope.newChild())
+    if name == SpecialForms.let.value.keyword:
+        [[_, name, value], tail] = SpecialFormSlicer(expression, SpecialForms.let)
+        value = Eval(value, currentScope.newChild())
         MustBeKind(name, "The first arg after a let must be a name", Kind.Reference)
         newScope = currentScope.addValue(name.value, value)
-        tail = expression.value[3:]
-        return [sExpression([IgnoredValue] + tail), newScope]
+        return [sExpression(tail), newScope]
 
-    if name == quoteKeyword:
+    if name == SpecialForms.quote.value.keyword:
         #quotes item directly after it
-        MustHaveLength(expression, 2)
-        snd = expression.value[1]
-        tail = expression.value[2:]
+        [[_, snd], tail] = SpecialFormSlicer(expression, SpecialForms.quote)
         newSnd = QuoteCode(snd)
-        return [[newSnd] + tail, currentScope]
+        return [sExpression([newSnd] + tail), currentScope]
 
-    if name == condKeyword:
-        MustHaveLength(expression, 4)
-        [_, condition, truePath, falsePath] = expression.value[:4]
-        tail = expression.value[4:]
-        evaluated = Eval(condition, currentScope.newChild())
+    if name == SpecialForms.cond.value.keyword:
         #eval condition, if true, return true unevaluated, else return falsepath unevaluated
+        [[_, condition, truePath, falsePath], tail] = SpecialFormSlicer(expression, SpecialForms.cond)
+        evaluated = Eval(condition, currentScope.newChild())
+        MustBeKind(evaluated, "Tried to evaluate an conditional, value to evaluate not a boolean", Kind.Boolean)
+        if evaluated.value:
+            return [sExpression([truePath] + tail), currentScope]
+        return [sExpression([falsePath] + tail), currentScope]
+
+
+
 
     ThrowAnError("Unknown special form (engine bug)", expression)

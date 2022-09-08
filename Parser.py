@@ -1,5 +1,5 @@
 from Tokenizer import tokenizeFull
-from classes import QuotedName, List, String
+from classes import QuotedName, List, String, Boolean
 from ParserCombinator import MS, Any, SOF, EOF
 
 linebreaks = MS("\n").OR(MS("\r"))
@@ -38,7 +38,9 @@ string = MS("\"").ignore()\
     .then(MS("\"").ignore())\
     .mapResult(lambda x: [String("".join(x))])
 
-inlineValues = string  # todo numbers and other literals
+bools = MS("true").OR(MS("false")).mapResult(Boolean)
+
+inlineValues = string.OR(bools)  # todo numbers and other literals
 
 """Any non-ignorable item that isn't an opening or closing bracket"""
 Atom = MS("[").OR(MS("]")).OR(SOF).OR(EOF)\

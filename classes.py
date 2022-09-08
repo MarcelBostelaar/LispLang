@@ -9,7 +9,7 @@ class Kind(Enum):
     sExpression = 5
     String = 6
     IgnoredValue = 7
-    SpecialFunc = 8
+    Boolean = 8
 
 
 class Value:
@@ -68,6 +68,27 @@ class String(Value):
         return True
 
 
+class Boolean(Value):
+    def __init__(self, value):
+        if value == "true":
+            super().__init__(True, Kind.Boolean)
+            return
+        if value == "false":
+            super().__init__(False, Kind.Boolean)
+            return
+        if value in [True, False]:
+            super().__init__(value, Kind.Boolean)
+            return
+        raise Exception("Not a valid boolean value")
+
+    def serialize(self):
+        if self.value:
+            return "true"
+        return "false"
+
+    def isSerializable(self):
+        return True
+
 # classes above may be used inside the language as data
 # beyond this are interpreter only types, such as lambda types, reference types, etc.
 
@@ -93,10 +114,10 @@ class Reference(Value):
         super().__init__(value, Kind.Reference)
 
 
-class SpecialFunc(Value):
-    """Handles the application of the build in functions which may have special properties"""
-    def __init__(self, value):
-        super().__init__(value, Kind.SpecialFunc)
+# class SpecialFunc(Value):
+#     """Handles the application of the build in functions which may have special properties"""
+#     def __init__(self, value):
+#         super().__init__(value, Kind.SpecialFunc)
 
 
 class Lambda(Value):
@@ -112,7 +133,7 @@ class Lambda(Value):
         self.bindIndex = bindIndex  # index of the arg that will bind next
 
     def bindIsFinished(self):
-        return self.boundScope.countValues() == len(self.bindings)
+        return self.boundScope.countFirstLevelValues() == len(self.bindings)
 
     def bind(self, variable):
         if self.bindIsFinished():
@@ -121,7 +142,7 @@ class Lambda(Value):
         return Lambda(self.bindings, self.body, newscope, self.bindIndex + 1)
 
     def bindingsLeft(self):
-        return len(self.bindings) - self.boundScope.countValues()
+        return len(self.bindings) - self.boundScope.countFirstLevelValues()
 
     def run(self, runFunc):
         """
@@ -134,43 +155,65 @@ class Lambda(Value):
         return self
 
 
+class VarType(Enum):
+    Regular = 1
+    Macro = 2
+
+
+class ScopedVar:
+    def __init__(self, value, vartype: VarType):
+        self.value = value
+        self.vartype = vartype
+
+
 class Scope:
     """A construct containing the currently accessible references"""
     def __init__(self, parent, startValues=None):
         if startValues is None:
             startValues = {}
         # currently scoped variables
-        self.__values__ = startValues
-        self.__parent__ = parent  # the scope in which this scope is located, and thus is also accessible
+        self.values = startValues
+        self.parent = parent  # the scope in which this scope is located, and thus is also accessible
 
-    def addValue(self, name, value):
-        if name in self.__values__.keys():
+    def addValue(self, name, value, varType=VarType.Regular):
+        if name in self.values.keys():
             raise Exception("Overwriting variables in the same scope is not allowed")
-        copy = self.__values__.copy()
-        copy[name] = value
-        return Scope(self.__parent__, copy)
+        copy = self.values.copy()
+        copy[name] = ScopedVar(value, varType)
+        return Scope(self.parent, copy)
 
-    def retrieveValue(self, name):
-        if name in self.__values__.keys():
-            return self.__values__[name]
-        if self.__parent__ is not None:
-            return self.__parent__.retrieveValue(name)
+    def __retrieve__(self, name):
+        if name in self.values.keys():
+            return self.values[name]
+        if self.parent is not None:
+            return self.parent.retrieveValue(name)
         raise Exception("Unknown variable")
 
+    def retrieveValue(self, name):
+        value = self.__retrieve__(name)
+        if value.vartype == VarType.Macro:
+            raise Exception("Tried to use macro as regular value, not allowed")
+        return self.__retrieve__(name).value
+
+    def retrieveVartype(self, name):
+        return self.__retrieve__(name).vartype
+
+    def isVarType(self, name, vartype: VarType):
+        value = self.__retrieve__(name)
+        return value.vartype == vartype
+
     def hasValue(self, name):
-        if name in self.__values__.keys():
+        if name in self.values.keys():
             return True
-        if self.__parent__ is not None:
-            return self.__parent__.hasValue(name)
+        if self.parent is not None:
+            return self.parent.hasValue(name)
         return False
 
-    def countValues(self):
-        if self.__parent__ is not None:
-            return len(self.__values__) + self.__parent__.countValues()
-        return len(self.__values__)
+    def countFirstLevelValues(self):
+        return len(self.values)
 
     def newChild(self):
         return Scope(self)
 
-    def __repr__(self) -> str:
-        return f"Scope({self.__values__}, {self.__parent__})"
+    # def __repr__(self) -> str:
+    #     return f"Scope({self.__values__}, {self.__parent__})"
