@@ -1,5 +1,7 @@
 from enum import Enum
 
+from langConfig import currentScopeKeyword
+
 
 class Kind(Enum):
     Lambda = 1
@@ -10,6 +12,7 @@ class Kind(Enum):
     String = 6
     IgnoredValue = 7
     Boolean = 8
+    Scope = 9
 
 
 class Value:
@@ -166,9 +169,10 @@ class ScopedVar:
         self.vartype = vartype
 
 
-class Scope:
+class Scope(Value):
     """A construct containing the currently accessible references"""
     def __init__(self, parent, startValues=None):
+        super(Scope, self).__init__(None, Kind.Scope)
         if startValues is None:
             startValues = {}
         # currently scoped variables
@@ -186,7 +190,10 @@ class Scope:
         if name in self.values.keys():
             return self.values[name]
         if self.parent is not None:
-            return self.parent.retrieveValue(name)
+            if self.parent.hasValue(name):
+                return self.parent.retrieveValue(name)
+        if name == currentScopeKeyword:
+            return ScopedVar(self, VarType.Regular)
         raise Exception("Unknown variable")
 
     def retrieveValue(self, name):

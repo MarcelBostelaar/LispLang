@@ -1,4 +1,5 @@
 import Evaluator
+from MacroExpand import DemacroTop
 from Parser import parseAll
 from Tokenizer import flatten, tokenizeFull
 import sys
@@ -12,7 +13,9 @@ def tokenizeParse(text):
 
 
 def main(argv):
-    command = argv[1]
+    args = iter(argv)
+    _ = next(args)
+    command = next(args)
     if command == "help":
         print("The usage is as follows:")
         print("main.py <operation> sourceFile [targetFile]")
@@ -21,10 +24,10 @@ def main(argv):
         print("evaluate / eval - compiles and runs the code directly, displays the result")
         print("debug - starts the rudimentary debugger")
         print("parse - shows the parsed AST")
-        print("compile / c - compiles the code to the specified file (currently de-macros)")
+        print("compile / c <targetFile> - compiles the code to the specified file (currently de-macros)")
         exit(0)
 
-    parsed = tokenizeParse(open(argv[2]).read())
+    parsed = tokenizeParse(open(next(args)).read())
     if not parsed.isSucces:
         print("Could not parse: ")
         print(parsed.remaining)
@@ -39,11 +42,23 @@ def main(argv):
 
     if command in ["eval", "evaluate"]:
         ast = Evaluator.toAST(parsed.content)
-        result = Evaluator.Eval(ast, Scope(None))
+        demacroedCode = DemacroTop(ast, Scope(None))
+        result = Evaluator.Eval(demacroedCode, Scope(None))
         print(result.serialize())
 
     if command in ["compile", "c"]:
-        print("Not implemented")
+        ast = Evaluator.toAST(parsed.content)
+        demacroedCode = DemacroTop(ast, Scope(None))
+        targetFile = next(args)
+        serialized = demacroedCode.serialize()
+        f = open(targetFile, "w")
+        f.write(serialized)
+        f.close()
+
+    # if command in ["runCompiled", "rc"]:
+    #     ast = Evaluator.toAST(parsed.content)
+    #     result = Evaluator.Eval(ast, Scope(None))
+    #     print(result.serialize())
 
     if command in ["step"]:
         print("Will not be implemented via python, can be easily implemented using "

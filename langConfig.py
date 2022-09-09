@@ -11,8 +11,13 @@ def c(keyword, length):
     return specialFormConfig(keyword, length)
 
 
+currentScopeKeyword = "currentScope"
+
 class SpecialForms(Enum):
-    macro = c("macro", 4) #macro macroname input body
+                            #callingScope is the scope from the place in which the macro was invoked to expand,
+                            # so that you can call macro expand on specific code with outside scope, and macro expand
+                            # on specific code with the internal macro scope, to aid in writing more hygenic macros
+    macro = c("macro", 5)   #macro macroname input callingScope body
     let = c("let", 3) #let varname value
     quote = c("quote", 2) #quote value
     Lambda = c("lambda", 3) #lambda args body
