@@ -20,7 +20,7 @@ class SpecialForms(Enum):
     macro = c("macro", 5)   #macro macroname input callingScope body
     let = c("let", 3) #let varname value
     quote = c("quote", 2) #quote value
+    list = c("list", 2) #list (a b c)
     Lambda = c("lambda", 3) #lambda args body
     cond = c("cond", 4) #cond bool truepath falsepath
-
 

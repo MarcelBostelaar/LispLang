@@ -10,7 +10,7 @@ class Kind(Enum):
     List = 4
     sExpression = 5
     String = 6
-    IgnoredValue = 7
+    # IgnoredValue = 7
     Boolean = 8
     Scope = 9
 
@@ -41,6 +41,11 @@ class List(Value):
             if not i.isSerializable():
                 return False
         return True
+
+    def concat(self, other):
+        if other.kind != Kind.List:
+            raise Exception("Cant concat two lists")
+        return List(self.value + other.value)
 
 
 class QuotedName(Value):
@@ -101,14 +106,14 @@ class sExpression(Value):
     def __init__(self, value):
         super().__init__(value, Kind.sExpression)
 
-
-class IgnoredValueClass(Value):
-    """A class to represent a value that was ignored. Ignored values at the start of an s expression are removed."""
-    def __init__(self):
-        super().__init__(None, Kind.IgnoredValue)
-
-
-IgnoredValue = IgnoredValueClass()
+#
+# class IgnoredValueClass(Value):
+#     """A class to represent a value that was ignored. Ignored values at the start of an s expression are removed."""
+#     def __init__(self):
+#         super().__init__(None, Kind.IgnoredValue)
+#
+#
+# IgnoredValue = IgnoredValueClass()
 
 
 class Reference(Value):
@@ -136,16 +141,13 @@ class Lambda(Value):
         self.bindIndex = bindIndex  # index of the arg that will bind next
 
     def bindIsFinished(self):
-        return self.boundScope.countFirstLevelValues() == len(self.bindings)
+        return self.bindIndex >= len(self.bindings)
 
     def bind(self, variable):
         if self.bindIsFinished():
             raise Exception("Binding fully bound lambda (engine error?)")
         newscope = self.boundScope.addValue(self.bindings[self.bindIndex], variable)
         return Lambda(self.bindings, self.body, newscope, self.bindIndex + 1)
-
-    def bindingsLeft(self):
-        return len(self.bindings) - self.boundScope.countFirstLevelValues()
 
     def run(self, runFunc):
         """
@@ -171,35 +173,28 @@ class ScopedVar:
 
 class Scope(Value):
     """A construct containing the currently accessible references"""
-    def __init__(self, parent, startValues=None):
+    def __init__(self, startValues=None):
         super(Scope, self).__init__(None, Kind.Scope)
         if startValues is None:
             startValues = {}
         # currently scoped variables
         self.values = startValues
-        self.parent = parent  # the scope in which this scope is located, and thus is also accessible
 
     def addValue(self, name, value, varType=VarType.Regular):
-        if name in self.values.keys():
-            raise Exception("Overwriting variables in the same scope is not allowed")
+        # if name in self.values.keys():
+        #     raise Exception("Overwriting variables in the same scope is not allowed")
         copy = self.values.copy()
         copy[name] = ScopedVar(value, varType)
-        return Scope(self.parent, copy)
+        return Scope(copy)
 
     def __retrieve__(self, name):
         if name in self.values.keys():
             return self.values[name]
-        if self.parent is not None:
-            if self.parent.hasValue(name):
-                return self.parent.retrieveValue(name)
         if name == currentScopeKeyword:
             return ScopedVar(self, VarType.Regular)
         raise Exception("Unknown variable")
 
     def retrieveValue(self, name):
-        value = self.__retrieve__(name)
-        if value.vartype == VarType.Macro:
-            raise Exception("Tried to use macro as regular value, not allowed")
         return self.__retrieve__(name).value
 
     def retrieveVartype(self, name):
@@ -212,15 +207,4 @@ class Scope(Value):
     def hasValue(self, name):
         if name in self.values.keys():
             return True
-        if self.parent is not None:
-            return self.parent.hasValue(name)
         return False
-
-    def countFirstLevelValues(self):
-        return len(self.values)
-
-    def newChild(self):
-        return Scope(self)
-
-    # def __repr__(self) -> str:
-    #     return f"Scope({self.__values__}, {self.__parent__})"

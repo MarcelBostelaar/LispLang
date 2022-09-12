@@ -12,7 +12,7 @@ def tokenizeParse(text):
     return parseAll.parse(tokenized)
 
 
-def main(argv):
+def main(*argv):
     args = iter(argv)
     _ = next(args)
     command = next(args)
@@ -42,13 +42,12 @@ def main(argv):
 
     if command in ["eval", "evaluate"]:
         ast = Evaluator.toAST(parsed.content)
-        demacroedCode = DemacroTop(ast, Scope(None))
-        result = Evaluator.Eval(demacroedCode, Scope(None))
+        demacroedCode = DemacroTop(ast, Scope())
+        result = Evaluator.Eval(demacroedCode, Scope())
         print(result.serialize())
 
     if command in ["compile", "c"]:
-        ast = Evaluator.toAST(parsed.content)
-        demacroedCode = DemacroTop(ast, Scope(None))
+        demacroedCode = DemacroTop(parsed.content, Scope())
         targetFile = next(args)
         serialized = demacroedCode.serialize()
         f = open(targetFile, "w")
@@ -64,23 +63,9 @@ def main(argv):
         print("Will not be implemented via python, can be easily implemented using "
               "algebraic effects in the self hosted compiler")
 
-main(["", "eval", "testcode.lisp"])
-
 if __name__ == '__main__':
-    #main(sys.argv)
+    main("", "eval", "testcode.lisp")
+    #main(*sys.argv)
     pass
-
-    #read
-    #parse
-    #eval
-
-
-    # result = tokenizeParse(open("code2.lisp").read())
-    # if(result.isSucces and len(result.remaining) == 0):
-    #     items = printSExpressions(result.content[1:-1])
-    #     print(" ".join(items))
-    # else:
-    #     print("error. Remaining:\n")
-    #     print(result.remaining)
 
 

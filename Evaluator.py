@@ -1,4 +1,4 @@
-from classes import Scope, Lambda, sExpression, Value, Kind, Reference, IgnoredValue, List
+from classes import Lambda, sExpression, Kind, Reference, List, QuotedName
 from langConfig import *
 
 """Only operates on demacroed code"""
@@ -36,7 +36,7 @@ def EvalLambda(expression, currentScope):
     #   restart loop
     tailhead = tail[0]
     truetail = tail[1:]
-    evaluated = Eval(tailhead, currentScope.newChild())
+    evaluated = Eval(tailhead, currentScope)
     applied = head \
         .bind(evaluated) \
         .run(Eval)
@@ -80,7 +80,7 @@ def Eval(expression, currentScope):
             ThrowAnError("Cant evaluate an s expression with 0 items in it")
         if len(expression.value) == 1:
             expression = expression.value[0]
-            currentScope = currentScope.newChild()
+            currentScope = currentScope
             continue
 
         ## two or more
@@ -106,9 +106,9 @@ def Eval(expression, currentScope):
             [expression, currentScope] = Dereference(expression, currentScope)
             continue
 
-        if head.kind == Kind.IgnoredValue:
-            expression = sExpression(tail)
-            continue
+        # if head.kind == Kind.IgnoredValue:
+        #     expression = sExpression(tail)
+        #     continue
 
         if head.kind == Kind.sExpression:
             expression = sExpression([Eval(head.value, currentScope.newChild())] + tail)
@@ -123,7 +123,7 @@ def Eval(expression, currentScope):
 
 
 def isSpecialFormKeyword(name) -> bool:
-    return name in [e.value.name for e in SpecialForms]
+    return name in [e.value.keyword for e in SpecialForms]
 
 
 def MustHaveLength(expression, N):
@@ -146,12 +146,12 @@ def MustBeKind(expression, message: str, *kinds: [Kind]):
 
 
 def QuoteCode(expression):
-    print("TODO implement quoting")
-    #TODO implement
-    # if ref, -> quote
-    # if sexpression -> list
-    # recursive everything in it
-    # literals -> remain the same
+    if expression.kind == Kind.sExpression:
+        return List([QuoteCode(x) for x in expression.value])
+    if expression.kind == Kind.Reference:
+        return QuotedName(expression.value)
+    if expression.kind in [Kind.List, Kind.Lambda, Kind.Scope]:
+        ThrowAnError("Engine error, cannot be quoted, in rewrite dont distinguish s expressions and lists", expression)
     return expression
 
 
@@ -169,7 +169,7 @@ def ExecuteSpecialForm(expression, currentScope):
         MustBeKind(args, lambdaerr, Kind.sExpression, )
         [MustBeKind(x, lambdaerr, Kind.Reference) for x in args.value]
         MustBeKind(body, "Body of a lambda must be an s expression or a single name", Kind.sExpression, Kind.Reference)
-        return [sExpression([Lambda([z.value for z in args.value], body, currentScope.newChild())] + rest), currentScope]
+        return [sExpression([Lambda([z.value for z in args.value], body, currentScope)] + rest), currentScope]
 
     if name == SpecialForms.macro.value.keyword:
         #ignore for this implementation, interpreter doesn't support eval yet
@@ -178,7 +178,7 @@ def ExecuteSpecialForm(expression, currentScope):
 
     if name == SpecialForms.let.value.keyword:
         [[_, name, value], tail] = SpecialFormSlicer(expression, SpecialForms.let)
-        value = Eval(value, currentScope.newChild())
+        value = Eval(value, currentScope)
         MustBeKind(name, "The first arg after a let must be a name", Kind.Reference)
         newScope = currentScope.addValue(name.value, value)
         return [sExpression(tail), newScope]
@@ -189,10 +189,17 @@ def ExecuteSpecialForm(expression, currentScope):
         newSnd = QuoteCode(snd)
         return [sExpression([newSnd] + tail), currentScope]
 
+    if name == SpecialForms.list.value.keyword:
+        #treats the list behind it as a list rather than an s expression
+        [[_, snd], tail] = SpecialFormSlicer(expression, SpecialForms.quote)
+        MustBeKind(snd, "Item after list must be a list", Kind.sExpression)
+        newSnd = List([Eval(x, currentScope) for x in snd.value])
+        return [sExpression([newSnd] + tail), currentScope]
+
     if name == SpecialForms.cond.value.keyword:
         #eval condition, if true, return true unevaluated, else return falsepath unevaluated
         [[_, condition, truePath, falsePath], tail] = SpecialFormSlicer(expression, SpecialForms.cond)
-        evaluated = Eval(condition, currentScope.newChild())
+        evaluated = Eval(condition, currentScope)
         MustBeKind(evaluated, "Tried to evaluate an conditional, value to evaluate not a boolean", Kind.Boolean)
         if evaluated.value:
             return [sExpression([truePath] + tail), currentScope]
