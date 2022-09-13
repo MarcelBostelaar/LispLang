@@ -1,8 +1,8 @@
-from Evaluator import toAST
-from MacroExpand import DemacroTop
-from classes import Scope
+from Evaluator.MacroExpand import DemacroTop
 from main import tokenizeParse
-from termcolor import colored, cprint
+from termcolor import cprint
+
+from Config.standardLibrary import standardScope
 
 catchErrors = False
 
@@ -29,7 +29,7 @@ def compileTestInternal(inputfile, expectedfile, testName):
     parsedexp = tokenizeParse(exp).content
 
 
-    demacroedCode = DemacroTop(parsedinp, Scope(None))
+    demacroedCode = DemacroTop(parsedinp, standardScope)
 
     realSer = demacroedCode.serialize()
     expSer = parsedexp.serialize()
@@ -44,4 +44,5 @@ def compileTestInternal(inputfile, expectedfile, testName):
 
 
 compileTest("CompileTests/macro identity.lisp", "CompileTests/macro identity.lisp", "Macro identity")
-compileTest("CompileTests/simple macro real.lisp", "CompileTests/simple macro expected.lisp", "2: Simplest demacro test")
+compileTest("CompileTests/simple macro real.lisp", "CompileTests/simple macro expected.lisp", "Simplest demacro test")
+compileTest("CompileTests/macroTailReal.lisp", "CompileTests/macroTailExpected.lisp", "Macro tail test")

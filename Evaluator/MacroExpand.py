@@ -1,5 +1,5 @@
-from classes import Kind, Scope, VarType, Lambda, List
-from langConfig import SpecialForms
+from Classes import Kind, Scope, VarType, Lambda, List, UserLambda
+from Config.langConfig import SpecialForms
 from Evaluator import MustBeKind, ThrowAnError, SpecialFormSlicer, Eval, toAST
 
 
@@ -57,7 +57,7 @@ def handleMacro(currentScope, expression):
     MustBeKind(callingScope, "Third arg after a macro def is the calling scope holder, must be a name", Kind.QuotedName)
     MustBeKind(body, "Macro body must be a list", Kind.List)
     expandedBody = DemacroTop(body, currentScope)
-    lambdaForm = Lambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentScope)
+    lambdaForm = UserLambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentScope)
     newScope = currentScope.addValue(varname.value, lambdaForm, VarType.Macro)
     return List([macroword, varname, callingScope, inputHolder, expandedBody])\
         .concat(DemacroTop(List(tail), newScope))  # the tail, demacroed, with the new macro added

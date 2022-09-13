@@ -6,7 +6,7 @@ let b = second item of <somelist>
 let c = third  item of <somelist>
 let rest = the rest of <somelist>
 */
-macro listcut ast context[
+macro listcut context ast[
     let varlist  [head ast]
     let tailvar  [head [tail ast]]
     let somelist [head [tail [tail ast]]]
@@ -35,7 +35,7 @@ macro listcut ast context[
 ]
 
 
-macro argMacro ast context[
+macro argMacro context ast[
 
     /*output (code unfinished)*/
     macro macroname nestedAst context [
@@ -45,11 +45,11 @@ macro argMacro ast context[
     ]
 ]
 
-macro list ast context [
+macro list context ast [
     /*moet special form zijn, list y => List([Eval(x, cxt) for x in y])*/
 ]
 
-macro letf ast context [
+macro letf context ast [
     let args [head ast]
     let body [head [tail ast]]
     let rest [tail [tail ast]]

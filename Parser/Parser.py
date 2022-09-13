@@ -1,5 +1,4 @@
-from Tokenizer import tokenizeFull
-from classes import QuotedName, List, String, Boolean
+from Evaluator.Classes import QuotedName, List, String, Boolean
 from ParserCombinator import MS, Any, SOF, EOF
 
 linebreaks = MS("\n").OR(MS("\r"))

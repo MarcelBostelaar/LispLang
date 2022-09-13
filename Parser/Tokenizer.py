@@ -1,4 +1,4 @@
-from ParserCombinator import SOF_value, EOF_value
+from Parser.ParserCombinator import SOF_value, EOF_value
 
 def flatten(list_):
     return [item for sublist in list_ for item in sublist]

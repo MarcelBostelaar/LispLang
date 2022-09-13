@@ -1,10 +1,8 @@
-import Evaluator
-from MacroExpand import DemacroTop
-from Parser import parseAll
-from Tokenizer import flatten, tokenizeFull
-import sys
-
-from classes import Scope
+from Evaluator import Evaluator
+from Evaluator.MacroExpand import DemacroTop
+from Parser.Parser import parseAll
+from Parser.Tokenizer import tokenizeFull
+from Config.standardLibrary import standardScope
 
 
 def tokenizeParse(text):
@@ -42,12 +40,12 @@ def main(*argv):
 
     if command in ["eval", "evaluate"]:
         ast = Evaluator.toAST(parsed.content)
-        demacroedCode = DemacroTop(ast, Scope())
-        result = Evaluator.Eval(demacroedCode, Scope())
+        demacroedCode = DemacroTop(ast, standardScope)
+        result = Evaluator.Eval(demacroedCode, standardScope)
         print(result.serialize())
 
     if command in ["compile", "c"]:
-        demacroedCode = DemacroTop(parsed.content, Scope())
+        demacroedCode = DemacroTop(parsed.content, standardScope)
         targetFile = next(args)
         serialized = demacroedCode.serialize()
         f = open(targetFile, "w")

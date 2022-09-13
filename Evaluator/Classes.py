@@ -1,6 +1,7 @@
+import functools
 from enum import Enum
 
-from langConfig import currentScopeKeyword
+from Config.langConfig import currentScopeKeyword
 
 
 class Kind(Enum):
@@ -122,32 +123,36 @@ class Reference(Value):
         super().__init__(value, Kind.Reference)
 
 
-# class SpecialFunc(Value):
-#     """Handles the application of the build in functions which may have special properties"""
-#     def __init__(self, value):
-#         super().__init__(value, Kind.SpecialFunc)
-
-
 class Lambda(Value):
     """In memory representation of a function"""
-    def __init__(self, bindings, body, currentScope, bindIndex=0):
+    def __init__(self):
         super().__init__(None, Kind.Lambda)
-        self.issExpression = False
 
+    def bind(self, argument):
+        raise NotImplementedError("Abstract class")
+
+    def run(self, runFunc):
+        raise NotImplementedError("Abstract class")
+
+
+class UserLambda(Lambda):
+    """In memory representation of a function"""
+    def __init__(self, bindings, body, currentScope, bindIndex=0):
+        super().__init__()
         self.bindings = bindings  # function arguments
         self.body = body  # the code to execute
         # Contains its own scope, equal to the scope captured at creation
         self.boundScope = currentScope
         self.bindIndex = bindIndex  # index of the arg that will bind next
 
-    def bindIsFinished(self):
+    def __bindIsFinished__(self):
         return self.bindIndex >= len(self.bindings)
 
     def bind(self, variable):
-        if self.bindIsFinished():
+        if self.__bindIsFinished__():
             raise Exception("Binding fully bound lambda (engine error?)")
         newscope = self.boundScope.addValue(self.bindings[self.bindIndex], variable)
-        return Lambda(self.bindings, self.body, newscope, self.bindIndex + 1)
+        return UserLambda(self.bindings, self.body, newscope, self.bindIndex + 1)
 
     def run(self, runFunc):
         """
@@ -155,8 +160,27 @@ class Lambda(Value):
         :param runFunc: Eval func of (expression, scope) -> expression
         :return:
         """
-        if self.bindIsFinished():
+        if self.__bindIsFinished__():
             return runFunc(self.body, self.boundScope)
+        return self
+
+
+class SystemFunction(Lambda):
+    """In memory representation of a system function"""
+
+    def __init__(self, function, bindingsLeft):
+        super().__init__()
+        self.function = function
+        self.bindingsLeft = bindingsLeft
+
+    def bind(self, argument):
+        if self.bindingsLeft <= 0:
+            raise Exception("Tried to bind to a fully bound system function")
+        return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
+
+    def run(self, runFunc):
+        if self.bindingsLeft == 0:
+            return self.function()
         return self
 
 

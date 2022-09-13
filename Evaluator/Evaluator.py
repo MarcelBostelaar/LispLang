@@ -1,5 +1,5 @@
-from classes import Lambda, sExpression, Kind, Reference, List, QuotedName
-from langConfig import *
+from Classes import sExpression, Kind, Reference, List, QuotedName, UserLambda
+from Config.langConfig import *
 
 """Only operates on demacroed code"""
 
@@ -169,7 +169,7 @@ def ExecuteSpecialForm(expression, currentScope):
         MustBeKind(args, lambdaerr, Kind.sExpression, )
         [MustBeKind(x, lambdaerr, Kind.Reference) for x in args.value]
         MustBeKind(body, "Body of a lambda must be an s expression or a single name", Kind.sExpression, Kind.Reference)
-        return [sExpression([Lambda([z.value for z in args.value], body, currentScope)] + rest), currentScope]
+        return [sExpression([UserLambda([z.value for z in args.value], body, currentScope)] + rest), currentScope]
 
     if name == SpecialForms.macro.value.keyword:
         #ignore for this implementation, interpreter doesn't support eval yet
@@ -204,8 +204,5 @@ def ExecuteSpecialForm(expression, currentScope):
         if evaluated.value:
             return [sExpression([truePath] + tail), currentScope]
         return [sExpression([falsePath] + tail), currentScope]
-
-
-
 
     ThrowAnError("Unknown special form (engine bug)", expression)
