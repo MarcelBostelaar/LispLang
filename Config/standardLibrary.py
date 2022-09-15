@@ -1,4 +1,3 @@
-import Evaluator.MacroExpand
 from Evaluator.Evaluator import MustBeKind
 from Evaluator.Classes import List, Kind, SystemFunction, Scope, Boolean
 

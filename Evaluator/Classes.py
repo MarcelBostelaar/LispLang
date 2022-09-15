@@ -10,7 +10,7 @@ class Kind(Enum):
     QuotedName = 3
     List = 4
     sExpression = 5
-    String = 6
+    Char = 6
     # IgnoredValue = 7
     Boolean = 8
     Scope = 9
@@ -38,7 +38,12 @@ class List(Value):
         super().__init__(value, Kind.List)
 
     def serialize(self):
-        return "[ " + " ".join([x.serialize() for x in self.value]) + " ]"
+        for i in self.value:
+            if i.kind != Kind.Char:
+                # Not a list of chars, ie its not a string
+                return "[ " + " ".join([x.serialize() for x in self.value]) + " ]"
+        # Print a list of chars (ie a string) as a string
+        return '"' + "".join([__escape_string__(x.value) for x in self.value]) + '"'
 
     def isSerializable(self):
         for i in self.value:
@@ -84,15 +89,20 @@ def __escape_string__(string):
     return string
 
 
-class String(Value):
+class Char(Value):
     def __init__(self, value):
-        super().__init__(value, Kind.String)
+        super().__init__(value, Kind.Char)
 
     def serialize(self):
-        return '"' + __escape_string__(self.value) + '"'
+        return 'c"' + __escape_string__(self.value) + '"'
 
     def isSerializable(self):
         return True
+
+    def equals(self, other):
+        if other.kind != self.kind:
+            return False
+        return self.value == other.value
 
 
 class Boolean(Value):

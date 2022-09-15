@@ -1,4 +1,4 @@
-from Evaluator.Classes import QuotedName, List, String, Boolean
+from Evaluator.Classes import QuotedName, List, Char, Boolean
 from ParserCombinator import MS, Any, SOF, EOF
 
 linebreaks = MS("\n").OR(MS("\r"))
@@ -27,7 +27,7 @@ def escapedChar(char, becomes):
 
 allEscapedChars = escapedChar("n", "\n")  # todo complete
 
-string = MS("\"").ignore()\
+stringBare = MS("\"").ignore()\
     .then(
         allEscapedChars
         .OR(
@@ -35,11 +35,29 @@ string = MS("\"").ignore()\
         ).many(0)
     )\
     .then(MS("\"").ignore())\
-    .mapResult(lambda x: [String("".join(x))])
+    .mapResult(lambda x: [Char("".join(x))])
+
+string = stringBare\
+    .mapResult(lambda x: [Char(y) for y in list(x)])\
+    .mapResult(List)
+
+
+def processChar(x):
+    if len(x) == 0:
+        raise "Char cant have length 0"
+    if len(x) == 1:
+        raise "Char must have length 1"
+    return Char(x)
+
+
+char = MS("c").ignore().then(stringBare)\
+    .mapResult(processChar)
+
+stringChars = string.OR(char)
 
 bools = MS("true").OR(MS("false")).mapResult(Boolean)
 
-inlineValues = string.OR(bools)  # todo numbers and other literals
+inlineValues = stringChars.OR(bools)  # todo numbers and other literals
 
 """Any non-ignorable item that isn't an opening or closing bracket"""
 Atom = MS("[").OR(MS("]")).OR(SOF).OR(EOF)\
