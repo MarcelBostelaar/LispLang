@@ -6,7 +6,7 @@ from Config.standardLibrary import standardScope
 
 
 def tokenizeParse(text):
-    tokenized = tokenizeFull(text, [*"/[]`,;()*<>\\ \"\t\r\n"])
+    tokenized = tokenizeFull(text, [*"[]`,;()*/<>@~+-%\\ \"\t\r\n"])
     return parseAll.parse(tokenized)
 
 

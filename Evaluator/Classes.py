@@ -28,6 +28,9 @@ class Value:
     def isSerializable(self):
         return False
 
+    def equals(self, other):
+        raise NotImplementedError("Not implemented equality for this class")
+
 
 class List(Value):
     """Represents a list of values"""
@@ -48,6 +51,16 @@ class List(Value):
             raise Exception("Cant concat two lists")
         return List(self.value + other.value)
 
+    def equals(self, other):
+        if other.kind != self.kind:
+            return False
+        if len(other.value) != len(self.value):
+            return False
+        for i in range(len(self.value)):
+            if not self.value[i].equals(other.value[i]):
+                return False
+        return True
+
 
 class QuotedName(Value):
     """Represent a quoted name, an unevaluated reference name, for use mostly in macros"""
@@ -59,6 +72,11 @@ class QuotedName(Value):
 
     def isSerializable(self):
         return True
+
+    def equals(self, other):
+        if other.kind != self.kind:
+            return False
+        return self.value == other.value
 
 
 def __escape_string__(string):
@@ -98,6 +116,11 @@ class Boolean(Value):
     def isSerializable(self):
         return True
 
+    def equals(self, other):
+        if other.kind != self.kind:
+            return False
+        return self.value == other.value
+
 # classes above may be used inside the language as data
 # beyond this are interpreter only types, such as lambda types, reference types, etc.
 
@@ -107,20 +130,19 @@ class sExpression(Value):
     def __init__(self, value):
         super().__init__(value, Kind.sExpression)
 
-#
-# class IgnoredValueClass(Value):
-#     """A class to represent a value that was ignored. Ignored values at the start of an s expression are removed."""
-#     def __init__(self):
-#         super().__init__(None, Kind.IgnoredValue)
-#
-#
-# IgnoredValue = IgnoredValueClass()
+    def equals(self, other):
+        # S expressions (which are different from lists) cannot be treated as data
+        raise "Cannot call equals on an s expression (running code), engine error"
 
 
 class Reference(Value):
     """Represents a named reference that needs to be evaluated"""
     def __init__(self, value):
         super().__init__(value, Kind.Reference)
+
+    def equals(self, other):
+        # References should be evaluated to their value when passed to a function
+        raise "Cannot call equals on a reference value (running code), engine error"
 
 
 class Lambda(Value):
@@ -133,6 +155,10 @@ class Lambda(Value):
 
     def run(self, runFunc):
         raise NotImplementedError("Abstract class")
+
+    def equals(self, other):
+        raise NotImplementedError("Equality between lambdas is not implemented in this engine due to implementation"
+                                  " difficulties, it should be eventually")
 
 
 class UserLambda(Lambda):
@@ -232,3 +258,8 @@ class Scope(Value):
         if name in self.values.keys():
             return True
         return False
+
+    def equals(self, other):
+        if other.kind != self.kind:
+            return False
+        return self.value == other.value

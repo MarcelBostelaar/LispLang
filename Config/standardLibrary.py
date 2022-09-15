@@ -1,5 +1,6 @@
+import Evaluator.MacroExpand
 from Evaluator.Evaluator import MustBeKind
-from Evaluator.Classes import List, Kind, SystemFunction, Scope
+from Evaluator.Classes import List, Kind, SystemFunction, Scope, Boolean
 
 
 def head(somelist: List):
@@ -14,9 +15,21 @@ def tail(somelist: List):
     return List(somelist.value[1:])
 
 
+def concat(listA, listB):
+    MustBeKind(listA, "concat can only operate on lists", Kind.List)
+    MustBeKind(listB, "concat can only operate on lists", Kind.List)
+    return listA.concat(listB)
+
+
+def equals(A, B):
+    return Boolean(A.equals(B))
+
+
 standardLibrary = {
     "head": SystemFunction(head, 1),
-    "tail": SystemFunction(tail, 1)
+    "tail": SystemFunction(tail, 1),
+    "concat": SystemFunction(concat, 2),
+    "equals": SystemFunction(equals, 2)
 }
 
 

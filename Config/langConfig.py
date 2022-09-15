@@ -23,5 +23,6 @@ class SpecialForms(Enum):
     list = c("list", 2) #list (a b c)
     Lambda = c("lambda", 3) #lambda args body
     cond = c("cond", 4) #cond bool truepath falsepath
+    ignore = c("ignore", 1) #ignore (somevalue or function)
 
 
