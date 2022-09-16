@@ -13,6 +13,10 @@ def c(keyword, length):
 
 currentScopeKeyword = "currentScope"
 
+# all the symbols parsed individually as atom names for enable more specialized syntax
+
+separateSymbols = "`,;(){}*/<>@~+-%\\"
+
 class SpecialForms(Enum):
                             #callingScope is the scope from the place in which the macro was invoked to expand,
                             # so that you can call macro expand on specific code with outside scope, and macro expand

@@ -1,13 +1,13 @@
 from Evaluator import Evaluator
 from Evaluator.MacroExpand import DemacroTop
 from Parser.Parser import parseAll
+from Parser.ParserCombinator import SOF_value, EOF_value
 from Parser.Tokenizer import tokenizeFull
 from Config.standardLibrary import standardScope
 
 
 def tokenizeParse(text):
-    tokenized = tokenizeFull(text, [*"[]`,;()*/<>@~+-%\\ \"\t\r\n"])
-    return parseAll.parse(tokenized)
+    return parseAll.parse([SOF_value] + list(text) + [EOF_value])
 
 
 def main(*argv):
@@ -60,6 +60,7 @@ def main(*argv):
     if command in ["step"]:
         print("Will not be implemented via python, can be easily implemented using "
               "algebraic effects in the self hosted compiler")
+
 
 if __name__ == '__main__':
     main("", "eval", "testcode.lisp")

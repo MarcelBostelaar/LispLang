@@ -11,7 +11,7 @@ class Kind(Enum):
     List = 4
     sExpression = 5
     Char = 6
-    # IgnoredValue = 7
+    Number = 7
     Boolean = 8
     Scope = 9
 
@@ -122,6 +122,26 @@ class Boolean(Value):
         if self.value:
             return "true"
         return "false"
+
+    def isSerializable(self):
+        return True
+
+    def equals(self, other):
+        if other.kind != self.kind:
+            return False
+        return self.value == other.value
+
+
+class Number(Value):
+    def __init__(self, value):
+        super().__init__(value, Kind.Number)
+        if isinstance(value, float):
+            self.value = value
+            return
+        raise "Cant save non float in number (engine bug)"
+
+    def serialize(self):
+        return str(self.value)
 
     def isSerializable(self):
         return True

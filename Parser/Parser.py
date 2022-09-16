@@ -1,5 +1,6 @@
-from Evaluator.Classes import QuotedName, List, Char, Boolean
-from ParserCombinator import MS, Any, SOF, EOF
+from Config.langConfig import separateSymbols
+from Evaluator.Classes import QuotedName, List, Char, Boolean, Number
+from ParserCombinator import MS, Any, SOF, EOF, reduce, AnyOfMS, ConcatStrings, MC
 
 linebreaks = MS("\n").OR(MS("\r"))
 whitespace = linebreaks.OR(MS("\t")).OR(MS(" "))
@@ -25,49 +26,56 @@ def escapedChar(char, becomes):
     return MS("\\").then(MS(char)).mapResult(lambda _: [becomes])
 
 
-allEscapedChars = escapedChar("n", "\n")  # todo complete
+def escapedChars(*pairs):
+    return reduce([escapedChar(x[0], x[1]) for x in pairs])
 
-stringBare = MS("\"").ignore()\
-    .then(
-        allEscapedChars
-        .OR(
-            MS("\"").mustFailThenTry(Any)
-        ).many(0)
-    )\
-    .then(MS("\"").ignore())\
-    .mapResult(lambda x: [Char("".join(x))])
 
-string = stringBare\
+allEscapedChars = escapedChars(["n", "\n"], ["t", "\t"], ["r", "\r"], ['"', '"'], ["'", "'"])
+
+
+def stringBase(min, max):
+    """A standard string base matcher with a minimum and maximum length (inclusive)"""
+    return MS("\"").ignore()\
+        .then(
+            allEscapedChars
+            .OR(
+                MS("\"").mustFailThenTry(Any)
+            ).many(min, max)
+        )\
+        .then(MS("\"").ignore())\
+        .mapResult(ConcatStrings)
+
+
+string = stringBase(0, None)\
     .mapResult(lambda x: [Char(y) for y in list(x)])\
     .mapResult(List)
 
-
-def processChar(x):
-    if len(x) == 0:
-        raise "Char cant have length 0"
-    if len(x) == 1:
-        raise "Char must have length 1"
-    return Char(x)
-
-
-char = MS("c").ignore().then(stringBare)\
-    .mapResult(processChar)
+char = MC("c").ignore().then(stringBase(1, 1)).mapResult(Char)
 
 stringChars = string.OR(char)
 
 bools = MS("true").OR(MS("false")).mapResult(Boolean)
 
-inlineValues = stringChars.OR(bools)  # todo numbers and other literals
+num0to9 = AnyOfMS(list("1234567890"))
+num1to9 = AnyOfMS(list("123456789"))
+positiveIntegers = num1to9.then(num0to9.many(0))
+negativeIntegers = MC("-").then(positiveIntegers)
+zero = MC("0")
+positiveDecimals = zero.OR(positiveIntegers).then(MC(".")).then(num0to9.many(1))
+negativeDecimals = MC("-").then(positiveDecimals)
+allIntegers = positiveIntegers.OR(negativeIntegers).OR(zero)\
+    .mapResult(ConcatStrings)\
+    .mapResult(lambda x: x + ".0")
+allDecimals = positiveDecimals.OR(negativeDecimals).mapResult(ConcatStrings)
 
-"""Any non-ignorable item that isn't an opening or closing bracket"""
-Atom = MS("[").OR(MS("]")).OR(SOF).OR(EOF)\
-    .mustFailThenTry(
-        inlineValues  # inline literals such as strings and numbers
-        .OR(  # everything else that has been tokenized
-            Any
-            .mapResult(lambda x: [QuotedName(x[0])])
-        )
-    ).wrap(ignore)
+allNumbers = allIntegers.OR(allDecimals).mapResult(float).mapResult(Number).wrap(ignore)
+
+inlineValues = stringChars.OR(bools).OR(allNumbers)
+
+separateItems = AnyOfMS(list(separateSymbols)).mapResult(lambda x: [QuotedName(x[0])])
+atozAndUnder = AnyOfMS(list(string.ascii_lowercase + string.ascii_uppercase + "_"))
+alphanumeric = num0to9.OR(atozAndUnder).many(1).mapResult(lambda x: [QuotedName(x[0])])
+Atom = inlineValues.OR(alphanumeric).OR(separateItems).wrap(ignore)
 
 
 def pureMS(specificString):

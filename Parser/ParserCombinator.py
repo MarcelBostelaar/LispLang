@@ -61,7 +61,7 @@ class Combinator:
             return result2
         return Combinator(internal)
 
-    def many(self, minimum):
+    def many(self, minimum, maximum=None):
         """Makes the parser combinator match N or more of itself"""
         def internal(tokens):
             accumulate = parseResult(True, [], tokens)
@@ -73,6 +73,9 @@ class Combinator:
                                          accumulate.content + result.content,
                                          result.remaining)
                 result = self.parse(accumulate.remaining)
+                if maximum is not None:
+                    if totalMatched >= maximum:
+                        return accumulate
             if totalMatched >= minimum:
                 return accumulate
             else:
@@ -102,14 +105,36 @@ class Combinator:
         return Combinator(internal)
 
 
-def MS(specificString):
-    """Match string"""
+def reduce(combinators):
+    reduced = combinators[0]
+    combinators = combinators[1:]
+    while len(combinators) != 0:
+        reduced = reduced.OR(combinators[0])
+        combinators = combinators[1:]
+    return reduced
+
+
+def MC(char):
+    """Match char"""
     def internal(tokens):
-        if(len(tokens) > 0):
-            if(tokens[0] == specificString):
+        if len(tokens) > 0:
+            if tokens[0] == char:
                 return parseResult(True, [tokens[0]], tokens[1:])
         return parseResult(False, None, tokens)
     return Combinator(internal)
+
+
+def ConcatStrings(items):
+    return "".join(items)
+
+
+def MS(specificString):
+    """Match string"""
+    return reduce([MC(x) for x in list(specificString)]).mapResult(ConcatStrings)
+
+
+def AnyOfMS(*specificStrings):
+    return reduce([MS(x) for x in specificStrings])
 
 
 def AnyFunc(tokens):
