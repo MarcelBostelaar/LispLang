@@ -1,6 +1,6 @@
-from Evaluator import Evaluator
+from Evaluator import EvaluatorCode
 from Evaluator.MacroExpand import DemacroTop
-from Parser.Parser import parseAll
+from Parser.ParserCode import parseAll
 from Parser.ParserCombinator import SOF_value, EOF_value
 from Parser.Tokenizer import tokenizeFull
 from Config.standardLibrary import standardScope

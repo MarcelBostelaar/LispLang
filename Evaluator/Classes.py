@@ -138,7 +138,7 @@ class Number(Value):
         if isinstance(value, float):
             self.value = value
             return
-        raise "Cant save non float in number (engine bug)"
+        raise Exception("Cant save non float in number (engine bug)")
 
     def serialize(self):
         return str(self.value)

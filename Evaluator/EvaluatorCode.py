@@ -1,4 +1,4 @@
-from Classes import sExpression, Kind, Reference, List, QuotedName, UserLambda
+from Evaluator.Classes import sExpression, Kind, Reference, List, QuotedName, UserLambda
 from Config.langConfig import *
 
 """Only operates on demacroed code"""

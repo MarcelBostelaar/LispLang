@@ -1,6 +1,8 @@
+import string
+
 from Config.langConfig import separateSymbols
 from Evaluator.Classes import QuotedName, List, Char, Boolean, Number
-from ParserCombinator import MS, Any, SOF, EOF, reduce, AnyOfMS, ConcatStrings, MC
+from Parser.ParserCombinator import MS, Any, SOF, EOF, reduceOR, AnyOfMS, ConcatStrings, MC
 
 linebreaks = MS("\n").OR(MS("\r"))
 whitespace = linebreaks.OR(MS("\t")).OR(MS(" "))
@@ -27,7 +29,7 @@ def escapedChar(char, becomes):
 
 
 def escapedChars(*pairs):
-    return reduce([escapedChar(x[0], x[1]) for x in pairs])
+    return reduceOR([escapedChar(x[0], x[1]) for x in pairs])
 
 
 allEscapedChars = escapedChars(["n", "\n"], ["t", "\t"], ["r", "\r"], ['"', '"'], ["'", "'"])
@@ -46,13 +48,13 @@ def stringBase(min, max):
         .mapResult(ConcatStrings)
 
 
-string = stringBase(0, None)\
+stringCombinator = stringBase(0, None)\
     .mapResult(lambda x: [Char(y) for y in list(x)])\
     .mapResult(List)
 
 char = MC("c").ignore().then(stringBase(1, 1)).mapResult(Char)
 
-stringChars = string.OR(char)
+stringChars = stringCombinator.OR(char)
 
 bools = MS("true").OR(MS("false")).mapResult(Boolean)
 

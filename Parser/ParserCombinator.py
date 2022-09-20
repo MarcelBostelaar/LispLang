@@ -6,7 +6,8 @@ class parseResult:
 
     def map(self, f):
         if self.isSucces:
-            self.content = f(self.content)
+            return parseResult(True, f(self.content), self.remaining)
+        return self
 
 
 class Combinator:
@@ -16,20 +17,28 @@ class Combinator:
         self.debugMessage = debugMessage
 
     def parse(self, tokens):
-        result = self.f(tokens)
-        if self.debugMessage is not None:
-            print(self.debugMessage)
-            if result.isSucces:
-                print("success, parsed:")
-                print(result.content)
-                print("remainder:")
-                print(result.remaining)
-                print("")
-            else:
-                print("failed, input:")
-                print(tokens)
-                print("")
-        return result
+        if self.debugMessage is None:
+            return self.f(tokens)
+        else:
+            try:
+                breakpoint = 10
+                result = self.f(tokens)
+                print(self.debugMessage)
+                if result.isSucces:
+                    print("success, parsed:")
+                    print(result.content)
+                    print("remainder:")
+                    print(result.remaining)
+                    print("")
+                else:
+                    print("failed, input:")
+                    print(tokens)
+                    print("")
+                return result
+            except Exception as e:
+                print("Exception while parsing")
+                print(self.debugMessage)
+                raise e
 
     def addDebugMessage(self, message):
         return Combinator(self.f, message)
@@ -79,7 +88,7 @@ class Combinator:
             if totalMatched >= minimum:
                 return accumulate
             else:
-                parseResult(False, accumulate.content, accumulate.remaining)
+                return parseResult(False, accumulate.content, accumulate.remaining)
         return Combinator(internal)
 
     def ignore(self):
@@ -100,16 +109,24 @@ class Combinator:
     def mapResult(self, g):
         def internal(tokens):
             result = self.parse(tokens)
-            result.map(g)
-            return result
+            return result.map(g)
         return Combinator(internal)
 
 
-def reduce(combinators):
+def reduceOR(combinators):
     reduced = combinators[0]
     combinators = combinators[1:]
     while len(combinators) != 0:
         reduced = reduced.OR(combinators[0])
+        combinators = combinators[1:]
+    return reduced
+
+
+def reduceTHEN(combinators):
+    reduced = combinators[0]
+    combinators = combinators[1:]
+    while len(combinators) != 0:
+        reduced = reduced.then(combinators[0])
         combinators = combinators[1:]
     return reduced
 
@@ -121,7 +138,8 @@ def MC(char):
             if tokens[0] == char:
                 return parseResult(True, [tokens[0]], tokens[1:])
         return parseResult(False, None, tokens)
-    return Combinator(internal)
+    comb = Combinator(internal)
+    return comb
 
 
 def ConcatStrings(items):
@@ -130,11 +148,11 @@ def ConcatStrings(items):
 
 def MS(specificString):
     """Match string"""
-    return reduce([MC(x) for x in list(specificString)]).mapResult(ConcatStrings)
+    return reduceTHEN([MC(x) for x in list(specificString)]).mapResult(ConcatStrings)
 
 
 def AnyOfMS(*specificStrings):
-    return reduce([MS(x) for x in specificStrings])
+    return reduceOR([MS(x) for x in specificStrings])
 
 
 def AnyFunc(tokens):
@@ -148,5 +166,5 @@ Any = Combinator(AnyFunc)
 
 SOF_value = 985743587435
 EOF_value = 874595340400
-SOF = MS(SOF_value)
-EOF = MS(EOF_value)
+SOF = MC(SOF_value)
+EOF = MC(EOF_value)
