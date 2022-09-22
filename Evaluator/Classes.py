@@ -14,6 +14,7 @@ class Kind(Enum):
     Number = 7
     Boolean = 8
     Scope = 9
+    EffectScope = 10
 
 
 class Value:
@@ -183,7 +184,7 @@ class Lambda(Value):
     def bind(self, argument):
         raise NotImplementedError("Abstract class")
 
-    def run(self, runFunc):
+    def run(self, runFunc, currentEffectHandlers):
         raise NotImplementedError("Abstract class")
 
     def equals(self, other):
@@ -210,14 +211,15 @@ class UserLambda(Lambda):
         newscope = self.boundScope.addValue(self.bindings[self.bindIndex], variable)
         return UserLambda(self.bindings, self.body, newscope, self.bindIndex + 1)
 
-    def run(self, runFunc):
+    def run(self, runFunc, currentEffectHandlers):
         """
         Returns an evaluated form of itself if its fully bound, return self if not fully bound
+        :param currentEffectHandlers:
         :param runFunc: Eval func of (expression, scope) -> expression
         :return:
         """
         if self.__bindIsFinished__():
-            return runFunc(self.body, self.boundScope)
+            return runFunc(self.body, self.boundScope, currentEffectHandlers)
         return self
 
 
@@ -234,7 +236,7 @@ class SystemFunction(Lambda):
             raise Exception("Tried to bind to a fully bound system function")
         return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
 
-    def run(self, runFunc):
+    def run(self, _, __):
         if self.bindingsLeft == 0:
             return self.function()
         return self
@@ -290,6 +292,11 @@ class Scope(Value):
         return False
 
     def equals(self, other):
-        if other.kind != self.kind:
-            return False
-        return self.value == other.value
+        raise NotImplementedError("Not implemented")
+
+# TODO add effect handlers in scope, make function to seperate out handlers and rest, because handlers are
+#  passed through the stack, but regular scope is passed through capture values, though both can shadow each other
+#  Locally (in regular scope). Lambda a -> handle a with x in y -> (inside y) Lamda a, shadows a 2 times,
+#  first func, then handler, then func again
+#  Filter to only handlers for function calls
+#  Filter out handlers for lambda/function/macro declarations

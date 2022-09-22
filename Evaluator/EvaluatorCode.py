@@ -27,7 +27,7 @@ def toAST(LLQ):
     return LLQ
 
 
-def EvalLambda(expression, currentScope):
+def EvalLambda(expression, currentScope, currentEffectHandlers):
     head = expression.value[0]
     tail = expression.value[1:]
     #   apply Eval(second arg) to it,
@@ -36,15 +36,15 @@ def EvalLambda(expression, currentScope):
     #   restart loop
     tailhead = tail[0]
     truetail = tail[1:]
-    evaluated = Eval(tailhead, currentScope)
+    evaluated = Eval(tailhead, currentScope, currentEffectHandlers)
     applied = head \
         .bind(evaluated) \
-        .run(Eval)
+        .run(Eval, currentEffectHandlers)
     expression = sExpression([applied] + truetail)
     return [expression, currentScope]
 
 
-def Dereference(expression, currentScope):
+def Dereference(expression, currentScope, currentEffectHandlers):
     head = expression.value[0]
     tail = expression.value[1:]
 
@@ -53,14 +53,15 @@ def Dereference(expression, currentScope):
         expression = sExpression([head] + tail)
         return [expression, currentScope]
     if isSpecialFormKeyword(head.value):
-        return ExecuteSpecialForm(expression, currentScope)
+        return ExecuteSpecialForm(expression, currentScope, currentEffectHandlers)
 
     ThrowAnError("Could not find reference " + head.value + ".", expression)
 
 
-def Eval(expression, currentScope):
+def Eval(expression, currentScope, currentEffectHandlers):
     """
     Evaluates a piece of interpreter representational code
+    :param currentEffectHandlers: The stack of effect handlers in use
     :param expression: s Expression and/or value
     :param currentScope: Currently scoped variables and their values
     :return: Return value of the calculation
@@ -69,7 +70,7 @@ def Eval(expression, currentScope):
     while True:
         if expression.kind != Kind.sExpression:
             if expression.kind == Kind.Reference:
-                [expression, currentScope] = Dereference(sExpression([expression]), currentScope)
+                [expression, currentScope] = Dereference(sExpression([expression]), currentScope, currentEffectHandlers)
                 continue
             return expression
 
@@ -103,7 +104,7 @@ def Eval(expression, currentScope):
         tail = expression.value[1:]
 
         if head.kind == Kind.Reference:
-            [expression, currentScope] = Dereference(expression, currentScope)
+            [expression, currentScope] = Dereference(expression, currentScope, currentEffectHandlers)
             continue
 
         # if head.kind == Kind.IgnoredValue:
@@ -111,11 +112,11 @@ def Eval(expression, currentScope):
         #     continue
 
         if head.kind == Kind.sExpression:
-            expression = sExpression([Eval(head.value, currentScope.newChild())] + tail)
+            expression = sExpression([Eval(head.value, currentScope, currentEffectHandlers), currentEffectHandlers] + tail)
             continue
 
         if head.kind == Kind.Lambda:
-            [expression, currentScope] = EvalLambda(expression, currentScope)
+            [expression, currentScope] = EvalLambda(expression, currentScope, currentEffectHandlers)
             continue
 
         # All other options are wrong
@@ -161,7 +162,7 @@ def SpecialFormSlicer(expression, formConfig: SpecialForms):
     return [expression.value[:length], expression.value[length:]]
 
 
-def ExecuteSpecialForm(expression, currentScope):
+def ExecuteSpecialForm(expression, currentScope, currentEffectHandlers):
     name = expression.value[0].value
     if name == SpecialForms.Lambda.value.keyword:
         [[_, args, body], rest] = SpecialFormSlicer(expression, SpecialForms.Lambda)
@@ -178,7 +179,7 @@ def ExecuteSpecialForm(expression, currentScope):
 
     if name == SpecialForms.let.value.keyword:
         [[_, name, value], tail] = SpecialFormSlicer(expression, SpecialForms.let)
-        value = Eval(value, currentScope)
+        value = Eval(value, currentScope, currentEffectHandlers)
         MustBeKind(name, "The first arg after a let must be a name", Kind.Reference)
         newScope = currentScope.addValue(name.value, value)
         return [sExpression(tail), newScope]
@@ -193,13 +194,13 @@ def ExecuteSpecialForm(expression, currentScope):
         #treats the list behind it as a list rather than an s expression
         [[_, snd], tail] = SpecialFormSlicer(expression, SpecialForms.quote)
         MustBeKind(snd, "Item after list must be a list", Kind.sExpression)
-        newSnd = List([Eval(x, currentScope) for x in snd.value])
+        newSnd = List([Eval(x, currentScope, currentEffectHandlers) for x in snd.value])
         return [sExpression([newSnd] + tail), currentScope]
 
     if name == SpecialForms.cond.value.keyword:
         #eval condition, if true, return true unevaluated, else return falsepath unevaluated
         [[_, condition, truePath, falsePath], tail] = SpecialFormSlicer(expression, SpecialForms.cond)
-        evaluated = Eval(condition, currentScope)
+        evaluated = Eval(condition, currentScope, currentEffectHandlers)
         MustBeKind(evaluated, "Tried to evaluate an conditional, value to evaluate not a boolean", Kind.Boolean)
         if evaluated.value:
             return [sExpression([truePath] + tail), currentScope]

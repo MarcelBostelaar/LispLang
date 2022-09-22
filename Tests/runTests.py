@@ -1,3 +1,4 @@
+from Evaluator.Classes import EffectHandlerScope
 from Evaluator.MacroExpand import DemacroTop
 from main import tokenizeParse
 from termcolor import cprint
@@ -5,7 +6,7 @@ from termcolor import cprint
 from Config.standardLibrary import standardScope
 from Tests.ParseTests import test1Expected
 
-catchErrors = True
+catchErrors = False
 
 
 def compileTest(inputfile, expectedfile, testName):
@@ -30,7 +31,7 @@ def compileTestInternal(inputfile, expectedfile, testName):
     parsedexp = tokenizeParse(exp).content
 
 
-    demacroedCode = DemacroTop(parsedinp, standardScope)
+    demacroedCode = DemacroTop(parsedinp, standardScope, EffectHandlerScope())
 
     realSer = demacroedCode.serialize()
     expSer = parsedexp.serialize()
