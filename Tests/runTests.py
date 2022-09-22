@@ -55,7 +55,7 @@ def parseTest(inputfile, outputExpected, testName):
     if not parsedinp.content.equals(outputExpected):
         cprint(testName + "failed, expected and parsed value dont match", "red")
         cprint("Expected:" + outputExpected.serialize(), "red")
-        cprint("Actual  :" + parsedinp.serialize(), "red")
+        cprint("Actual  :" + parsedinp.content.serialize(), "red")
         print("")
     else:
         cprint(testName + " passed", "green")

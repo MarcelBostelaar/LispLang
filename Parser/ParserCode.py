@@ -56,27 +56,27 @@ char = MC("c").ignore().then(stringBase(1, 1)).mapResult(Char)
 
 stringChars = stringCombinator.OR(char)
 
-bools = MS("true").OR(MS("false")).mapResult(Boolean)
+bools = MS("true").OR(MS("false")).mapSingle(Boolean)
 
-num0to9 = AnyOfMS(list("1234567890"))
-num1to9 = AnyOfMS(list("123456789"))
+num0to9 = AnyOfMS(*list("1234567890"))
+num1to9 = AnyOfMS(*list("123456789"))
 positiveIntegers = num1to9.then(num0to9.many(0))
 negativeIntegers = MC("-").then(positiveIntegers)
 zero = MC("0")
 positiveDecimals = zero.OR(positiveIntegers).then(MC(".")).then(num0to9.many(1))
 negativeDecimals = MC("-").then(positiveDecimals)
 allIntegers = positiveIntegers.OR(negativeIntegers).OR(zero)\
-    .mapResult(ConcatStrings)\
-    .mapResult(lambda x: x + ".0")
+    .mapResult(lambda x: x + [".0"])\
+    .mapResult(ConcatStrings)
 allDecimals = positiveDecimals.OR(negativeDecimals).mapResult(ConcatStrings)
 
-allNumbers = allIntegers.OR(allDecimals).mapResult(float).mapResult(Number).wrap(ignore)
+allNumbers = allDecimals.OR(allIntegers).mapSingle(float).mapSingle(Number).wrap(ignore)
 
 inlineValues = stringChars.OR(bools).OR(allNumbers)
 
-separateItems = AnyOfMS(list(separateSymbols)).mapResult(lambda x: [QuotedName(x[0])])
-atozAndUnder = AnyOfMS(list(string.ascii_lowercase + string.ascii_uppercase + "_"))
-alphanumeric = num0to9.OR(atozAndUnder).many(1).mapResult(lambda x: [QuotedName(x[0])])
+separateItems = AnyOfMS(*list(separateSymbols)).mapSingle(QuotedName)
+atozAndUnder = AnyOfMS(*list(string.ascii_lowercase + string.ascii_uppercase + "_"))
+alphanumeric = num0to9.OR(atozAndUnder).many(1).mapResult(ConcatStrings).mapSingle(QuotedName)
 Atom = inlineValues.OR(alphanumeric).OR(separateItems).wrap(ignore)
 
 

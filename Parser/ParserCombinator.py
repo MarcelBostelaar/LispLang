@@ -112,6 +112,9 @@ class Combinator:
             return result.map(g)
         return Combinator(internal)
 
+    def mapSingle(self, g):
+        return self.mapResult(lambda x: x[0]).mapResult(g).mapResult(lambda x: [x])
+
 
 def reduceOR(combinators):
     reduced = combinators[0]
@@ -143,12 +146,29 @@ def MC(char):
 
 
 def ConcatStrings(items):
-    return "".join(items)
+    return ["".join(items)]
+
+
+def listEquals(a, b):
+    """Shallow compare equal length lists"""
+    if len(a) is not len(b):
+        raise Exception("Bug")
+    zipped = zip(a, b)
+    for (x, y) in zipped:
+        if x != y:
+            return False
+    return True
 
 
 def MS(specificString):
-    """Match string"""
-    return reduceTHEN([MC(x) for x in list(specificString)]).mapResult(ConcatStrings)
+    def internal(tokens):
+        length = len(specificString)
+        if len(tokens) >= length:
+            if listEquals(tokens[:length], specificString):
+                return parseResult(True, ["".join(tokens[:length])], tokens[length:])
+        return parseResult(False, None, tokens)
+    comb = Combinator(internal)
+    return comb
 
 
 def AnyOfMS(*specificStrings):
