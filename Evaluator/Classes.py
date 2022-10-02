@@ -293,3 +293,13 @@ class Scope(Value):
         if other.kind != self.kind:
             return False
         return self.value == other.value
+
+
+class StackFrame:
+    """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
+    def __init__(self, scopedNames, scopedValues, handlerSet, parent=None):
+        self.scopedNames = scopedNames
+        self.scopedVars = scopedValues
+        """The handlers in this stack frame, not those of parents"""
+        self.handlers = handlerSet
+        self.parent = parent
