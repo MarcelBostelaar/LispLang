@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 from enum import Enum
 
@@ -14,6 +16,7 @@ class Kind(Enum):
     Number = 7
     Boolean = 8
     Scope = 9
+    StackReturnValue = 10
 
 
 class Value:
@@ -175,6 +178,11 @@ class Reference(Value):
         raise "Cannot call equals on a reference value (running code), engine error"
 
 
+class StackReturnValue(Value):
+    def __init__(self):
+        super().__init__(None, Kind.StackReturnValue)
+
+
 class Lambda(Value):
     """In memory representation of a function"""
     def __init__(self):
@@ -193,6 +201,7 @@ class Lambda(Value):
 
 class UserLambda(Lambda):
     """In memory representation of a function"""
+    #TODO fix current scope usage
     def __init__(self, bindings, body, currentScope, bindIndex=0):
         super().__init__()
         self.bindings = bindings  # function arguments
@@ -297,9 +306,48 @@ class Scope(Value):
 
 class StackFrame:
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
-    def __init__(self, scopedNames, scopedValues, handlerSet, parent=None):
+    def __init__(self, executionState, scopedNames=None, scopedValues=None, handlerSet=None,
+                 childReturnValue=None, parent=None):
+        if handlerSet is None:
+            handlerSet = {}
+        if scopedValues is None:
+            scopedValues = {}
+        if scopedNames is None:
+            scopedNames = {}
+        self.executionState = executionState
         self.scopedNames = scopedNames
-        self.scopedVars = scopedValues
+        self.scopedValues = scopedValues
         """The handlers in this stack frame, not those of parents"""
-        self.handlers = handlerSet
+        self.handlerSet = handlerSet
         self.parent = parent
+        self.__childReturnValue__ = childReturnValue
+
+    def hasScopedRegularValue(self, name):
+        raise NotImplementedError("")
+
+    def retrieveScopedRegularValue(self, name):
+        raise NotImplementedError("")
+
+    def withExecutionState(self, executionState) -> StackFrame:
+        copy = self.__copy__()
+        copy.executionState = executionState
+        return copy
+
+    def throwError(self, errorMessage):
+        raise NotImplementedError("")
+
+    def captured(self) -> StackFrame:
+        """Returns a new stack that contains all capturable data, so no captured handlers.
+        This is then used to execute user created functions, or closures, later on"""
+        raise NotImplementedError("")
+
+    def addScopedRegularValue(self, name, value) -> StackFrame:
+        raise NotImplementedError("")
+
+    def __copy__(self) -> StackFrame:
+        raise NotImplementedError("")
+
+    def getChildReturnValue(self):
+        if self.__childReturnValue__ is None:
+            self.throwError("No child to return found. Engine bug")
+        return self.__childReturnValue__

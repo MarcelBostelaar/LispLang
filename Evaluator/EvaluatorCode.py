@@ -1,4 +1,5 @@
-from Evaluator.Classes import sExpression, Kind, Reference, List, QuotedName, UserLambda
+from Evaluator.Classes import sExpression, Kind, Reference, List, QuotedName, UserLambda, StackFrame, Value, \
+    StackReturnValue
 from Config.langConfig import *
 
 """Only operates on demacroed code"""
@@ -8,10 +9,10 @@ def stringify(sExpression):
     return "Error stringification not implemented"
 
 
-def ThrowAnError(message, currentExpression=None):
-    if currentExpression is None:
-        raise Exception(message)
-    raise Exception(message + "\nLine: " + stringify(currentExpression))
+# def ThrowAnError(message, currentExpression=None):
+#     if currentExpression is None:
+#         raise Exception(message)
+#     raise Exception(message + "\nLine: " + stringify(currentExpression))
 
 
 def toAST(LLQ):
@@ -44,18 +45,19 @@ def EvalLambda(expression, currentScope):
     return [expression, currentScope]
 
 
-def Dereference(expression, currentScope):
-    head = expression.value[0]
-    tail = expression.value[1:]
+def Dereference(currentFrame: StackFrame) -> StackFrame:
+    head = currentFrame.executionState.value[0]
+    tail = currentFrame.executionState.value[1:]
 
-    if currentScope.hasValue(head.value):
-        head = currentScope.retrieveValue(head.value)
+    if currentFrame.hasScopedRegularValue(head.value):
+        head = currentFrame.retrieveScopedRegularValue(head.value)
         expression = sExpression([head] + tail)
-        return [expression, currentScope]
+        return currentFrame.withExecutionState(expression)
+    #TODO check for handlers here
     if isSpecialFormKeyword(head.value):
-        return ExecuteSpecialForm(expression, currentScope)
+        return ExecuteSpecialForm(currentFrame)
 
-    ThrowAnError("Could not find reference " + head.value + ".", expression)
+    currentFrame.throwError("Could not find reference " + head.value + ".")
 
 
 
@@ -69,9 +71,10 @@ def MustHaveLength(expression, N):
                      + str(N) + " items arguments, only has " + str(len(expression.value)))
 
 
-def MustBeKind(expression, message: str, *kinds: [Kind]):
+def MustBeKind(containingStack: StackFrame, expression, message: str, *kinds: [Kind]):
     """
     Error check for all allowed types of an expression
+    :param containingStack:
     :param expression:
     :param message:
     :param kinds:
@@ -79,7 +82,7 @@ def MustBeKind(expression, message: str, *kinds: [Kind]):
     """
     if expression.kind in kinds:
         return
-    ThrowAnError(message + "\nIt has type " + expression.kind.name, expression)
+    containingStack.throwError(message + "\nIt has type " + expression.kind.name)
 
 
 def QuoteCode(expression):
@@ -97,34 +100,44 @@ def SpecialFormSlicer(expression, formConfig: SpecialForms):
     MustHaveLength(expression, length)
     return [expression.value[:length], expression.value[length:]]
 
-# TODO creates new stack frame
-def ExecuteSpecialForm(expression, currentScope):
-    name = expression.value[0].value
+
+def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
+    name = currentFrame.executionState.value[0].value
     if name == SpecialForms.Lambda.value.keyword:
-        [[_, args, body], rest] = SpecialFormSlicer(expression, SpecialForms.Lambda)
+        [[_, args, body], rest] = SpecialFormSlicer(currentFrame.executionState, SpecialForms.Lambda)
         lambdaerr = "First arg after lambda must be a flat list/s expression of names"
-        MustBeKind(args, lambdaerr, Kind.sExpression, )
-        [MustBeKind(x, lambdaerr, Kind.Reference) for x in args.value]
-        MustBeKind(body, "Body of a lambda must be an s expression or a single name", Kind.sExpression, Kind.Reference)
-        return [sExpression([UserLambda([z.value for z in args.value], body, currentScope)] + rest), currentScope]
+        MustBeKind(currentFrame, args, lambdaerr, Kind.sExpression, )
+        [MustBeKind(currentFrame, x, lambdaerr, Kind.Reference) for x in args.value]
+        MustBeKind(currentFrame, body, "Body of a lambda must be an s expression or a single name",
+                   Kind.sExpression, Kind.Reference)
+        return currentFrame.withExecutionState(
+            sExpression([UserLambda([z.value for z in args.value], body, currentFrame.captured())] + rest)
+        )
 
     if name == SpecialForms.macro.value.keyword:
         #ignore for this implementation, interpreter doesn't support eval yet
-        [_, rest] = SpecialFormSlicer(expression, SpecialForms.macro)
-        return [sExpression(rest), currentScope]
+        [_, rest] = SpecialFormSlicer(currentFrame.executionState, SpecialForms.macro)
+        return currentFrame.withExecutionState(rest)
 
     if name == SpecialForms.let.value.keyword:
-        [[_, name, value], tail] = SpecialFormSlicer(expression, SpecialForms.let)
-        value = Eval(value, currentScope)
-        MustBeKind(name, "The first arg after a let must be a name", Kind.Reference)
-        newScope = currentScope.addValue(name.value, value)
-        return [sExpression(tail), newScope]
+        [[let, name, value], tail] = SpecialFormSlicer(currentFrame.executionState, SpecialForms.let)
+        MustBeKind(currentFrame, name, "The first arg after a let must be a name", Kind.Reference)
+
+        if value.kind == Kind.sExpression:
+            # Item needs to be further evaluated
+            x = sExpression([let, name, StackReturnValue()] + tail.value)
+            updatedParent = currentFrame.withExecutionState(x)  # replace item with return value placeholder
+            newFrame = StackFrame(value, parent=updatedParent)  # create child stack to calculate result
+            return newFrame
+        else:
+            value = Eval(currentFrame.withExecutionState(value))  # retrieve the raw value
+        return currentFrame.addScopedRegularValue(name.value, value).withExecutionState(tail)
 
     if name == SpecialForms.quote.value.keyword:
         #quotes item directly after it
-        [[_, snd], tail] = SpecialFormSlicer(expression, SpecialForms.quote)
+        [[_, snd], tail] = SpecialFormSlicer(currentFrame.executionState, SpecialForms.quote)
         newSnd = QuoteCode(snd)
-        return [sExpression([newSnd] + tail), currentScope]
+        return currentFrame.executionState(sExpression([newSnd] + tail))
 
     if name == SpecialForms.list.value.keyword:
         #treats the list behind it as a list rather than an s expression
@@ -144,21 +157,25 @@ def ExecuteSpecialForm(expression, currentScope):
 
     ThrowAnError("Unknown special form (engine bug)", expression)
 
+
 # TODO creates new stack frame
-def Eval(expression, currentScope):
+def Eval(currentFrame: StackFrame) -> Value:
     """
     Evaluates a piece of interpreter representational code
     :param expression: s Expression and/or value
-    :param currentScope: Currently scoped variables and their values
+    :param currentStack: Current stack of execution
     :return: Return value of the calculation
     """
     # continue statements used to achieve tail call optimisation, and to keep stack usage to a minimum
     while True:
-        if expression.kind != Kind.sExpression:
-            if expression.kind == Kind.Reference:
-                [expression, currentScope] = Dereference(sExpression([expression]), currentScope)
+        if currentFrame.executionState.kind != Kind.sExpression:
+            if currentFrame.executionState.kind == Kind.Reference:
+                currentFrame = Dereference(currentFrame)
                 continue
-            return expression
+            if currentFrame.executionState.kind == Kind.StackReturnValue:
+                currentFrame = currentFrame.withExecutionState(currentFrame.getChildReturnValue())
+                continue
+            return currentFrame.executionState
 
         ##its an s expression
         # if 0 children, error, cant execute
@@ -206,5 +223,5 @@ def Eval(expression, currentScope):
             continue
 
         # All other options are wrong
-        ThrowAnError("Cannot apply an argument to value at head.", expression)
+        currentFrame.throwError("Cant apply arguments to type at head")
 
