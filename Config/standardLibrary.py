@@ -1,4 +1,4 @@
-from Evaluator.EvaluatorCode import MustBeKind
+from Evaluator.SupportFunctions import MustBeKind
 from Evaluator.Classes import List, Kind, SystemFunction, Scope, Boolean
 
 

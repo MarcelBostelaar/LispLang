@@ -1,6 +1,7 @@
 from Evaluator.Classes import Kind, Scope, VarType, Lambda, List, UserLambda
 from Config.langConfig import SpecialForms
-from Evaluator.EvaluatorCode import MustBeKind, ThrowAnError, SpecialFormSlicer, Eval, toAST
+from Evaluator.EvaluatorCode import ThrowAnError, Eval
+from Evaluator.SupportFunctions import toAST, MustBeKind, SpecialFormSlicer
 
 
 def isMacro(expression, currentScope):

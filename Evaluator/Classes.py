@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+from abc import ABC
 from enum import Enum
 
 from Config.langConfig import currentScopeKeyword
@@ -160,7 +161,7 @@ class Number(Value):
 
 class sExpression(Value):
     """A piece of lisp code being evaluated"""
-    def __init__(self, value):
+    def __init__(self, value: list):
         super().__init__(value, Kind.sExpression)
 
     def equals(self, other):
@@ -182,25 +183,42 @@ class StackReturnValue(Value):
     def __init__(self):
         super().__init__(None, Kind.StackReturnValue)
 
+    def equals(self, other):
+        raise "Cannot call equals on a stack return value (running code), engine error"
+
+
 
 class Lambda(Value):
     """In memory representation of a function"""
     def __init__(self):
         super().__init__(None, Kind.Lambda)
 
-    def bind(self, argument):
-        raise NotImplementedError("Abstract class")
-
-    def run(self, runFunc):
+    def bind(self, argument) -> Lambda:
         raise NotImplementedError("Abstract class")
 
     def equals(self, other):
         raise NotImplementedError("Equality between lambdas is not implemented in this engine due to implementation"
                                   " difficulties, it should be eventually")
 
+    def canRun(self) -> bool:
+        raise NotImplementedError("Abstract class")
+
+    def createFrame(self, parentFrame) -> StackFrame:
+        raise NotImplementedError("Abstract class")
+
 
 class UserLambda(Lambda):
     """In memory representation of a function"""
+
+    def canRun(self) -> bool:
+        return self.__bindIsFinished__()
+
+    def createFrame(self, parentFrame) -> StackFrame:
+        raise NotImplementedError("")
+
+    def equals(self, other):
+        return super(UserLambda, self).equals(other)
+
     #TODO fix current scope usage
     def __init__(self, bindings, body, currentScope, bindIndex=0):
         super().__init__()
@@ -214,24 +232,20 @@ class UserLambda(Lambda):
         return self.bindIndex >= len(self.bindings)
 
     def bind(self, variable):
-        if self.__bindIsFinished__():
-            raise Exception("Binding fully bound lambda (engine error?)")
-        newscope = self.boundScope.addValue(self.bindings[self.bindIndex], variable)
-        return UserLambda(self.bindings, self.body, newscope, self.bindIndex + 1)
-
-    def run(self, runFunc):
-        """
-        Returns an evaluated form of itself if its fully bound, return self if not fully bound
-        :param runFunc: Eval func of (expression, scope) -> expression
-        :return:
-        """
-        if self.__bindIsFinished__():
-            return runFunc(self.body, self.boundScope)
-        return self
+        raise NotImplementedError("")
 
 
 class SystemFunction(Lambda):
     """In memory representation of a system function"""
+
+    def equals(self, other):
+        super(SystemFunction, self).equals(other)
+
+    def canRun(self) -> bool:
+        return self.bindingsLeft == 0
+
+    def createFrame(self, parentFrame) -> StackFrame:
+        return StackFrame(self.function(), parent=parentFrame)
 
     def __init__(self, function, bindingsLeft):
         super().__init__()
@@ -242,11 +256,6 @@ class SystemFunction(Lambda):
         if self.bindingsLeft <= 0:
             raise Exception("Tried to bind to a fully bound system function")
         return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
-
-    def run(self, runFunc):
-        if self.bindingsLeft == 0:
-            return self.function()
-        return self
 
 
 class VarType(Enum):
@@ -351,3 +360,8 @@ class StackFrame:
         if self.__childReturnValue__ is None:
             self.throwError("No child to return found. Engine bug")
         return self.__childReturnValue__
+
+    def withChildReturnValue(self, value):
+        copy = self.__copy__()
+        copy.__childReturnValue__ = value
+        return copy

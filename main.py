@@ -1,3 +1,4 @@
+import Evaluator.SupportFunctions
 from Evaluator import EvaluatorCode
 from Evaluator.MacroExpand import DemacroTop
 from Parser.ParserCode import parseAll
@@ -39,7 +40,7 @@ def main(*argv):
         print(parsed.content.serialize())
 
     if command in ["eval", "evaluate"]:
-        ast = Evaluator.toAST(parsed.content)
+        ast = Evaluator.SupportFunctions.toAST(parsed.content)
         demacroedCode = DemacroTop(ast, standardScope)
         result = Evaluator.Eval(demacroedCode, standardScope)
         print(result.serialize())
