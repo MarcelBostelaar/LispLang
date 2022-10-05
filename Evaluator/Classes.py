@@ -4,6 +4,8 @@ import functools
 from abc import ABC
 from enum import Enum
 
+from termcolor import cprint
+
 from Config.langConfig import currentScopeKeyword
 
 
@@ -258,9 +260,7 @@ class SystemFunction(Lambda):
         return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
 
 
-class VarType(Enum):
-    Regular = 1
-    Macro = 2
+
 
 
 class ScopedVar:
@@ -313,10 +313,17 @@ class Scope(Value):
         return self.value == other.value
 
 
+class VarType(Enum):
+    Regular = 1
+    Macro = 2
+
+
 class StackFrame:
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
-    def __init__(self, executionState, scopedNames=None, scopedValues=None, handlerSet=None,
+    def __init__(self, executionState, scopedNames=None, scopedValues=None, scopedMacros=None, handlerSet=None,
                  childReturnValue=None, parent=None):
+        if scopedMacros is None:
+            scopedMacros = {}
         if handlerSet is None:
             handlerSet = {}
         if scopedValues is None:
@@ -326,16 +333,25 @@ class StackFrame:
         self.executionState = executionState
         self.scopedNames = scopedNames
         self.scopedValues = scopedValues
+        self.scopedMacros = scopedMacros
         """The handlers in this stack frame, not those of parents"""
         self.handlerSet = handlerSet
         self.parent = parent
         self.__childReturnValue__ = childReturnValue
 
     def hasScopedRegularValue(self, name):
-        raise NotImplementedError("")
+        if name in self.scopedNames.keys():
+            return self.scopedNames[name] == VarType.Regular
+        return False
 
     def retrieveScopedRegularValue(self, name):
-        raise NotImplementedError("")
+        if not self.hasScopedRegularValue(name):
+            if name not in self.scopedNames.keys():
+                self.throwError("Tried to retrieve regular value " + name + ". Value was not found in scope.")
+            else:
+                self.throwError("Tried to retrieve regular value " + name +
+                                ". This value is a " + self.scopedNames[name].name + " value, not a regular value.")
+        return self.scopedValues[name]
 
     def withExecutionState(self, executionState) -> StackFrame:
         copy = self.__copy__()
@@ -343,18 +359,30 @@ class StackFrame:
         return copy
 
     def throwError(self, errorMessage):
-        raise NotImplementedError("")
+        raise NotImplementedError("Error tracing not implemented")
 
     def captured(self) -> StackFrame:
         """Returns a new stack that contains all capturable data, so no captured handlers.
         This is then used to execute user created functions, or closures, later on"""
-        raise NotImplementedError("")
+        cprint("Function Captured on the stackframe isn't implemented, returns unaltered frame.", color="red")
+        #TODO implement
+        return self
 
     def addScopedRegularValue(self, name, value) -> StackFrame:
-        raise NotImplementedError("")
+        copy = self.__copy__()
+        copy.scopedNames[name] = VarType.Regular
+        copy.scopedValues[name] = value
+        return copy
 
     def __copy__(self) -> StackFrame:
-        raise NotImplementedError("")
+        return StackFrame(self.executionState,
+                          scopedNames=self.scopedNames.copy(),
+                          scopedValues=self.scopedValues.copy(),
+                          scopedMacros=self.scopedMacros,
+                          handlerSet=self.handlerSet.copy(),
+                          childReturnValue=self.__childReturnValue__,
+                          parent=self.parent
+                          )
 
     def getChildReturnValue(self):
         if self.__childReturnValue__ is None:
