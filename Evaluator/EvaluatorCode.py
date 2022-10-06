@@ -16,7 +16,7 @@ def EvalLambda(currentFrame: StackFrame) -> StackFrame:
         old = currentFrame.withExecutionState(
             sExpression([head, StackReturnValue()] + trueTail)
         )
-        new = StackFrame(tailHead, parent=old)
+        new = old.child(tailHead)
         return new
 
     applied = head.bind(
@@ -96,7 +96,7 @@ def Eval(currentFrame: StackFrame) -> Value:
             old = currentFrame.withExecutionState(
                 sExpression([StackReturnValue()] + tail)
             )
-            currentFrame = StackFrame(head, parent=old)
+            currentFrame = old.child(head)
             continue
 
         if head.kind == Kind.Lambda:

@@ -1,146 +1,114 @@
-from Evaluator.Classes import Kind, Scope, VarType, Lambda, List, UserLambda
+import Config.langConfig
+from Evaluator.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, QuotedName, Value
 from Config.langConfig import SpecialForms
-from Evaluator.EvaluatorCode import ThrowAnError, Eval
+from Evaluator.EvaluatorCode import Eval
 from Evaluator.SupportFunctions import toAST, MustBeKind, SpecialFormSlicer
 
 
-def isMacro(expression, currentScope):
-    """
-    Returns whether the given expression is a macro keyword
-    :param expression:
-    :param currentScope:
-    :return:
-    """
-    if expression.kind == Kind.QuotedName:
-        if currentScope.hasValue(expression.value):
-            if currentScope.isVarType(expression.value, VarType.Macro):
-                return True
-    return False
+def demacroSubelementSingle(currentFrame: StackFrame) -> Value:
+    if currentFrame.executionState.kind == Kind.List:
+        return DemacroTop(currentFrame)
+    if currentFrame.hasScopedMacroValue(currentFrame.executionState.value):
+        currentFrame.throwError("Element in this position may not be a macro")
+    return currentFrame.executionState
 
 
-def demacroSubelementSingle(expression, currentScope):
-    if expression.kind == Kind.List:
-        return DemacroTop(expression, currentScope)
-    if isMacro(expression, currentScope):
-        ThrowAnError("Element in this position may not be a macro", expression)
-    return expression
-
-
-def demacroSubelements(listOfExpressions: [], currentScope):
+def demacroSubelements(currentFrame: StackFrame) -> [Value]:
     """
     Applies the demacro process to all the subelements in the expression, with a new scope
     Top level may not be a macro
-    :param listOfExpressions:
-    :param currentScope:
-    :return:
     """
-    return [demacroSubelementSingle(x, currentScope) for x in listOfExpressions]
+    return [demacroSubelementSingle(currentFrame.child(x)) for x in currentFrame.executionState]
 
 
-def handleMacroInvocation(expression, currentScope):
-    head = expression.value[0]
-    tail = expression.value[1:]
+def handleMacroInvocation(currentFrame: StackFrame) -> Value:
+    head = currentFrame.executionState.value[0]
+    tail = currentFrame.executionState.value[1:]
 
-    lambdaVal: Lambda = currentScope.retrieveValue(head.value)
-    result = lambdaVal\
-        .bind(currentScope)\
-        .bind(List(tail))\
-        .run(Eval)
+    lambdaVal: Lambda = currentFrame.retrieveScopedMacroValue(head.value)
+    newFrame = currentFrame.child(sExpression([lambdaVal, QuotedName(Config.langConfig.currentScopeKeyword), List(tail)]))
+    result = Eval(newFrame)
     if not result.isSerializable():
-        ThrowAnError("Macro returned something non-serializable (not LLQ)", expression)
-    return DemacroTop(result, currentScope)
+        currentFrame.throwError("Macro returned something non-serializable (not LLQ)")
+    return DemacroTop(currentFrame.withExecutionState(result))
 
 
-def handleMacro(currentScope, expression):
-    [[macroword, varname, callingScope, inputHolder, body], tail] = SpecialFormSlicer(expression, SpecialForms.macro)
-    MustBeKind(varname, "First arg after a macro def must be a name", Kind.QuotedName)
-    MustBeKind(inputHolder, "Second arg after a macro def is the input holder, must be a name", Kind.QuotedName)
-    MustBeKind(callingScope, "Third arg after a macro def is the calling scope holder, must be a name", Kind.QuotedName)
-    MustBeKind(body, "Macro body must be a list", Kind.List)
-    expandedBody = DemacroTop(body, currentScope)
-    lambdaForm = UserLambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentScope)
-    newScope = currentScope.addValue(varname.value, lambdaForm, VarType.Macro)
+def handleMacro(currentFrame: StackFrame) -> Value:
+    [[macroword, varname, callingScope, inputHolder, body], tail] = SpecialFormSlicer(currentFrame, SpecialForms.macro)
+    MustBeKind(currentFrame, varname, "First arg after a macro def must be a name", Kind.QuotedName)
+    MustBeKind(currentFrame, inputHolder, "Second arg after a macro def is the input holder, must be a name", Kind.QuotedName)
+    MustBeKind(currentFrame, callingScope, "Third arg after a macro def is the calling scope holder, must be a name", Kind.QuotedName)
+    MustBeKind(currentFrame, body, "Macro body must be a list", Kind.List)
+    expandedBody = DemacroTop(currentFrame.child(body))
+    lambdaForm = UserLambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentFrame.captured())
+    newFrame = currentFrame.addScopedMacroValue(varname.value, lambdaForm)
     return List([macroword, varname, callingScope, inputHolder, expandedBody])\
-        .concat(DemacroTop(List(tail), newScope))  # the tail, demacroed, with the new macro added
+        .concat(DemacroTop(newFrame.withExecutionState(List(tail))))
 
 
-
-def handleLet(currentScope, expression):
-    [[letword, varname, body], tail] = SpecialFormSlicer(expression, SpecialForms.let)
-    MustBeKind(varname, "The first arg after a let must be a name", Kind.QuotedName)
-    expandedBody = DemacroTop(body, currentScope)
-    # if isStatic(expandedBody, currentScope): # left out for the interpreter
-    evaluated = Eval(expandedBody, currentScope)
-    currentScope = currentScope.addValue(varname.value, evaluated, VarType.Regular)
-    return List([letword, varname, expandedBody]).concat(  # demacroed version of the let
-        DemacroTop(List(tail), currentScope))  # the tail, demacroed, with if applicable
+def handleLet(currentFrame: StackFrame) -> Value:
+    [[letword, varname, body], tail] = SpecialFormSlicer(currentFrame, SpecialForms.let)
+    MustBeKind(currentFrame, varname, "The first arg after a let must be a name", Kind.QuotedName)
+    expandedBody = DemacroTop(currentFrame.child(body))
+    createdValue = Eval(currentFrame.child(toAST(expandedBody)))
+    newFrame = currentFrame.addScopedRegularValue(varname.value, createdValue)
+    return List([letword, varname, expandedBody])\
+        .concat(DemacroTop(newFrame.withExecutionState(List(tail))))
 
 
-def DemacroTop(expression, currentScope: Scope):
+def handleQuotedNameAtHead(currentFrame: StackFrame) -> Value:
+    head = currentFrame.executionState.value[0]
+
+    #handle macro expands
+    if currentFrame.hasScopedRegularValue(head.value):
+        #case function/value
+        return List(demacroSubelements(currentFrame))
+    elif currentFrame.hasScopedMacroValue(head.value):
+        return handleMacroInvocation(currentFrame)
+
+    # possibily a special form, we only care about the macro, let and quote form
+    if head.value == SpecialForms.let.value.keyword:
+        return handleLet(currentFrame)
+
+    if head.value == SpecialForms.macro.value.keyword:
+        return handleMacro(currentFrame)
+
+    if head.value == SpecialForms.quote.value.keyword:
+        # quoted code should NOT be demacroed (so the item following a QUOTE special form)
+        [quotewordAndItem, tail] = SpecialFormSlicer(currentFrame, SpecialForms.quote)
+        return List(quotewordAndItem + demacroSubelements(currentFrame.withExecutionState(tail)))
+
+    return List(demacroSubelements(currentFrame))
+
+
+def handleList(currentFrame: StackFrame) -> Value:
+
+    if len(currentFrame.executionState.value) == 0:
+        return currentFrame.executionState
+
+    head = currentFrame.executionState.value[0]
+
+    if head.kind == Kind.QuotedName:
+        return handleQuotedNameAtHead(currentFrame)
+    #all others, initial is not any sort of macro or special form we need to deal with
+    return List(demacroSubelements(currentFrame))
+
+
+def handleNotAList(currentFrame: StackFrame) -> Value:
+    if currentFrame.executionState.kind == Kind.QuotedName:
+        if currentFrame.hasScopedMacroValue(currentFrame.executionState[0].value):
+            currentFrame.throwError("Found a macro without any code behind it, invalid macro usage")
+    # its a literal.
+    return currentFrame.executionState[0]
+
+
+def DemacroTop(currentFrame: StackFrame) -> Value:
     """
     Demacroes a given piece of code
     :param expression: LLQ of code
     :param currentScope: Compile time scope
     :return: LLQ of demacroed code
     """
-    if expression.kind != Kind.List:
-        return handleNotAList(expression, currentScope)
-
-    if len(expression.value) == 0:
-        return expression
-
-    head = expression.value[0]
-
-    if head.kind == Kind.QuotedName:
-        return handleQuotedName(expression, currentScope)
-    #all others, initial is not any sort of macro or special form we need to deal with
-    return List(demacroSubelements(expression.value, currentScope))
-
-
-def handleQuotedName(expression, currentScope):
-    """
-    :param currentScope:
-    :param expression:
-    :param head:
-    :param tail:
-    :return:
-    """
-
-    head = expression.value[0]
-
-    #handle macro expands
-    if currentScope.hasValue(head.value):
-        if currentScope.isVarType(head.value, VarType.Macro):
-            return handleMacroInvocation(expression, currentScope)
-        else: #case function/value
-            return List(demacroSubelements(expression.value, currentScope))
-
-    # possibily a special form, we only care about the macro, let and quote form
-    if head.value == SpecialForms.let.value.keyword:
-        return handleLet(currentScope, expression)
-
-    if head.value == SpecialForms.macro.value.keyword:
-        return handleMacro(currentScope, expression)
-
-    if head.value == SpecialForms.quote.value.keyword:
-        # quoted code should NOT be demacroed (so the item following a QUOTE special form)
-        return List(expression.value[:2] + demacroSubelements(expression.value[2:], currentScope))
-
-    return List(demacroSubelements(expression.value, currentScope))
-
-
-def handleNotAList(expression, currentScope):
-    if expression.kind == Kind.QuotedName:
-        if isMacro(expression, currentScope):
-            ThrowAnError("Found a macro without any code behind it, invalid macro usage", expression)
-    # its a literal.
-    return expression
-
-# normally speaking, you should check this, however, the interpreter will just throw an error at runtime
-# if you use non static functions
-# def isStatic(expression, currentScope: Scope, *selfScopeNames):
-#     not implemented
-#
-#     #
-#
-#     return False
+    if currentFrame.executionState.kind != Kind.List:
+        return handleNotAList(currentFrame)
+    return handleList(currentFrame)

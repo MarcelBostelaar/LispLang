@@ -10,7 +10,7 @@ def handleSpecialFormCond(currentFrame: StackFrame):
     if condition.kind == Kind.sExpression:
         x = sExpression([condAtom, StackReturnValue(), truePath, falsePath] + tail)
         currentFrame = currentFrame.withExecutionState(x)
-        newFrame = StackFrame(condition, parent=currentFrame)
+        newFrame = currentFrame.child(condition)
         return newFrame
     evaluated = dereference(currentFrame.withExecutionState(condition))
     MustBeKind(currentFrame, evaluated, "Tried to evaluate an conditional, value to evaluate not a boolean",
@@ -39,7 +39,7 @@ def handleSpecialFormLet(currentFrame: StackFrame):
         # Item needs to be further evaluated
         x = sExpression([let, name, StackReturnValue()] + tail.value)
         updatedParent = currentFrame.withExecutionState(x)  # replace item with return value placeholder
-        newFrame = StackFrame(value, parent=updatedParent)  # create child stack to calculate result
+        newFrame = updatedParent.child(value)  # create child stack to calculate result
         return newFrame
     else:
         value = dereference(currentFrame.withExecutionState(value))  # retrieve the raw value
@@ -53,7 +53,7 @@ def handleSpecialFormList(currentFrame: StackFrame):
     listMapped, newStackExpression = handleSpecialFormListStep(currentFrame, snd)
     if newStackExpression is not None:
         currentFrame = currentFrame.withExecutionState(sExpression([listAtom, sExpression(listMapped)] + tail))
-        newStack = StackFrame(newStackExpression, parent=currentFrame)
+        newStack = currentFrame.child(newStackExpression)
         return newStack
     return currentFrame.withExecutionState(List(listMapped))
 

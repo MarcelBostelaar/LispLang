@@ -6,6 +6,7 @@ from enum import Enum
 
 from termcolor import cprint
 
+import Config.langConfig
 from Config.langConfig import currentScopeKeyword
 
 
@@ -246,8 +247,8 @@ class SystemFunction(Lambda):
     def canRun(self) -> bool:
         return self.bindingsLeft == 0
 
-    def createFrame(self, parentFrame) -> StackFrame:
-        return StackFrame(self.function(), parent=parentFrame)
+    def createFrame(self, parentFrame: StackFrame) -> StackFrame:
+        return parentFrame.child(self)
 
     def __init__(self, function, bindingsLeft):
         super().__init__()
@@ -260,98 +261,49 @@ class SystemFunction(Lambda):
         return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
 
 
-
-
-
-class ScopedVar:
-    def __init__(self, value, vartype: VarType):
-        self.value = value
-        self.vartype = vartype
-
-
-class Scope(Value):
-    """A construct containing the currently accessible references"""
-    def __init__(self, startValues=None):
-        super(Scope, self).__init__(None, Kind.Scope)
-        if startValues is None:
-            startValues = {}
-        # currently scoped variables
-        self.values = startValues
-
-    def addValue(self, name, value, varType=VarType.Regular):
-        # if name in self.values.keys():
-        #     raise Exception("Overwriting variables in the same scope is not allowed")
-        copy = self.values.copy()
-        copy[name] = ScopedVar(value, varType)
-        return Scope(copy)
-
-    def __retrieve__(self, name):
-        if name in self.values.keys():
-            return self.values[name]
-        if name == currentScopeKeyword:
-            return ScopedVar(self, VarType.Regular)
-        raise Exception("Unknown variable")
-
-    def retrieveValue(self, name):
-        return self.__retrieve__(name).value
-
-    def retrieveVartype(self, name):
-        return self.__retrieve__(name).vartype
-
-    def isVarType(self, name, vartype: VarType):
-        value = self.__retrieve__(name)
-        return value.vartype == vartype
-
-    def hasValue(self, name):
-        if name in self.values.keys():
-            return True
-        return False
-
-    def equals(self, other):
-        if other.kind != self.kind:
-            return False
-        return self.value == other.value
-
-
 class VarType(Enum):
     Regular = 1
     Macro = 2
 
 
-class StackFrame:
+class StackFrame(Value):
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
-    def __init__(self, executionState, scopedNames=None, scopedValues=None, scopedMacros=None, handlerSet=None,
-                 childReturnValue=None, parent=None):
-        if scopedMacros is None:
-            scopedMacros = {}
-        if handlerSet is None:
-            handlerSet = {}
-        if scopedValues is None:
-            scopedValues = {}
-        if scopedNames is None:
-            scopedNames = {}
+    def __init__(self, executionState):
+        super().__init__(None, Kind.Scope)
         self.executionState = executionState
-        self.scopedNames = scopedNames
-        self.scopedValues = scopedValues
-        self.scopedMacros = scopedMacros
+        """Read only. Current code being operated on in this frame."""
+        self.parent = None
+        """Read only. Parent stack frame of this stack."""
+        self.__scopedNames__ = {}
+        self.__scopedValues__ = {}
+        self.__scopedMacros__ = {}
+        self.__handlerSet__ = {}
         """The handlers in this stack frame, not those of parents"""
-        self.handlerSet = handlerSet
-        self.parent = parent
-        self.__childReturnValue__ = childReturnValue
+        self.__childReturnValue__ = None
+
+    def child(self, executionState: Value) -> StackFrame:
+        old = self
+        newchild = self.withExecutionState(executionState)
+        newchild.parent = old
+        return newchild
 
     def hasScopedRegularValue(self, name):
-        if name in self.scopedNames.keys():
-            return self.scopedNames[name] == VarType.Regular
+        if name == Config.langConfig.currentScopeKeyword:
+            return True
+        if name in self.__scopedNames__.keys():
+            return self.__scopedNames__[name] == VarType.Regular
         return False
 
     def retrieveScopedRegularValue(self, name):
+        if name == Config.langConfig.currentScopeKeyword:
+            return self
         if not self.hasScopedRegularValue(name):
-            if name not in self.scopedNames.keys():
+            if name not in self.__scopedNames__.keys():
                 self.throwError("Tried to retrieve regular value " + name + ". Value was not found in scope.")
             else:
                 self.throwError("Tried to retrieve regular value " + name +
-                                ". This value is a " + self.scopedNames[name].name + " value, not a regular value.")
-        return self.scopedValues[name]
+                                ". This value is a " + self.__scopedNames__[name].name + " value, not a regular value.")
+        return self.__scopedValues__[name]
 
     def withExecutionState(self, executionState) -> StackFrame:
         copy = self.__copy__()
@@ -376,21 +328,15 @@ class StackFrame:
         #TODO implement
         return self
 
-    def addScopedRegularValue(self, name, value) -> StackFrame:
-        copy = self.__copy__()
-        copy.scopedNames[name] = VarType.Regular
-        copy.scopedValues[name] = value
-        return copy
-
     def __copy__(self) -> StackFrame:
-        return StackFrame(self.executionState,
-                          scopedNames=self.scopedNames.copy(),
-                          scopedValues=self.scopedValues.copy(),
-                          scopedMacros=self.scopedMacros,
-                          handlerSet=self.handlerSet.copy(),
-                          childReturnValue=self.__childReturnValue__,
-                          parent=self.parent
-                          )
+        newcopy = StackFrame(self.executionState)
+        newcopy.__scopedNames__ = self.__scopedNames__.copy()
+        newcopy.__scopedValues__ = self.__scopedValues__.copy()
+        newcopy.__scopedMacros__ = self.__scopedMacros__
+        newcopy.__handlerSet__ = self.__handlerSet__.copy()
+        newcopy.childReturnValue = self.__childReturnValue__
+        newcopy.parent = self.parent
+        return newcopy
 
     def getChildReturnValue(self):
         if self.__childReturnValue__ is None:
@@ -400,4 +346,34 @@ class StackFrame:
     def withChildReturnValue(self, value):
         copy = self.__copy__()
         copy.__childReturnValue__ = value
+        return copy
+
+    def hasScopedMacroValue(self, name):
+        if name in self.__scopedNames__.keys():
+            if self.__scopedNames__[name] == VarType.Macro:
+                return True
+        return False
+
+    def retrieveScopedMacroValue(self, name):
+        if not self.hasScopedMacroValue(name):
+            self.throwError("Tried to retrieve macro '" + name + "'. Macro not found in scope.")
+        return self.__scopedMacros__[name]
+
+    def checkReservedKeyword(self, name):
+        if name in Config.langConfig.reservedWords:
+            self.throwError("Tried to override the reserved keyword '" + name + "'. Now allowed.")
+
+    def addScopedMacroValue(self, name, value):
+        self.checkReservedKeyword(name)
+        self.checkReservedKeyword(name)
+        copy = self.__copy__()
+        copy.__scopedNames__[name] = VarType.Macro
+        copy.__scopedMacros__[name] = value
+        return copy
+
+    def addScopedRegularValue(self, name, value) -> StackFrame:
+        self.checkReservedKeyword(name)
+        copy = self.__copy__()
+        copy.__scopedNames__[name] = VarType.Regular
+        copy.__scopedValues__[name] = value
         return copy
