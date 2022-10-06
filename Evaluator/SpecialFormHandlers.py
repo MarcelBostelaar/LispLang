@@ -1,6 +1,6 @@
 from Config.langConfig import SpecialForms
 from Evaluator.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List
-from Evaluator.SupportFunctions import dereference, MustBeKind, SpecialFormSlicer
+from Evaluator.SupportFunctions import dereference, MustBeKind, SpecialFormSlicer, QuoteCode
 
 
 def handleSpecialFormCond(currentFrame: StackFrame):
@@ -71,3 +71,31 @@ def handleSpecialFormListStep(currentFrame, snd):
         else:
             listMapped.append(dereference(currentFrame.withExecutionState(i)))
     return listMapped, newStackExpression
+
+
+def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
+    name = currentFrame.executionState.value[0].value
+    if name == SpecialForms.Lambda.value.keyword:
+        return handleSpecialFormLambda(currentFrame)
+
+    if name == SpecialForms.macro.value.keyword:
+        # ignore for this implementation, interpreter doesn't support eval yet
+        [_, rest] = SpecialFormSlicer(currentFrame, SpecialForms.macro)
+        return currentFrame.withExecutionState(rest)
+
+    if name == SpecialForms.let.value.keyword:
+        return handleSpecialFormLet(currentFrame)
+
+    if name == SpecialForms.quote.value.keyword:
+        # quotes item directly after it
+        [[_, snd], tail] = SpecialFormSlicer(currentFrame, SpecialForms.quote)
+        newSnd = QuoteCode(currentFrame, snd)
+        return currentFrame.executionState(sExpression([newSnd] + tail))
+
+    if name == SpecialForms.list.value.keyword:
+        return handleSpecialFormList(currentFrame)
+
+    if name == SpecialForms.cond.value.keyword:
+        return handleSpecialFormCond(currentFrame)
+
+    currentFrame.throwError("Unknown special form (engine bug)")

@@ -358,8 +358,16 @@ class StackFrame:
         copy.executionState = executionState
         return copy
 
+    def __stackTrace__(self):
+        cprint("\tat: " + self.executionState.serialize(), color="red")
+        if self.parent is not None:
+            self.parent.__stackTrace__()
+
     def throwError(self, errorMessage):
-        raise NotImplementedError("Error tracing not implemented")
+        cprint("Error while evaluating code.", color="red")
+        cprint(errorMessage, color="red")
+        self.__stackTrace__()
+        raise Exception("Runtime error")
 
     def captured(self) -> StackFrame:
         """Returns a new stack that contains all capturable data, so no captured handlers.
