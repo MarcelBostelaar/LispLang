@@ -28,7 +28,7 @@ def handleSpecialFormLambda(currentFrame: StackFrame):
     MustBeKind(currentFrame, body, "Body of a lambda must be an s expression or a single name",
                Kind.sExpression, Kind.Reference)
     return currentFrame.withExecutionState(
-        sExpression([UserLambda([z.value for z in args.value], body, currentFrame.captured())] + rest)
+        sExpression([UserLambda([z.value for z in args.value], body, currentFrame)] + rest)
     )
 
 
@@ -59,9 +59,15 @@ def handleSpecialFormList(currentFrame: StackFrame):
 
 
 def handleSpecialFormListStep(currentFrame, snd):
+    """
+    Evaluate the items in snd into their fully evaluated form.
+    :param currentFrame:
+    :param snd:
+    :return:
+    """
     newStackExpression = None
     listMapped = []
-    for i in snd:
+    for i in snd.value:
         if i.kind == Kind.sExpression:
             if newStackExpression is not None:
                 listMapped.append(StackReturnValue())

@@ -4,7 +4,7 @@ from Evaluator.MacroExpand import DemacroTop
 from Parser.ParserCode import parseAll
 from Parser.ParserCombinator import SOF_value, EOF_value
 from Parser.Tokenizer import tokenizeFull
-from Config.standardLibrary import standardScope
+from Config.standardLibrary import outerDefaultRuntimeFrame
 
 
 def tokenizeParse(text):
@@ -37,18 +37,18 @@ def main(*argv):
         exit(1)
 
     if command in ["parse"]:
-        print(parsed.content.serialize())
+        print(parsed.content.serializeLLQ())
 
     if command in ["eval", "evaluate"]:
         ast = Evaluator.SupportFunctions.toAST(parsed.content)
-        demacroedCode = DemacroTop(ast, standardScope)
-        result = Evaluator.Eval(demacroedCode, standardScope)
-        print(result.serialize())
+        demacroedCode = DemacroTop(ast, outerDefaultRuntimeFrame)
+        result = Evaluator.Eval(demacroedCode, outerDefaultRuntimeFrame)
+        print(result.serializeLLQ())
 
     if command in ["compile", "c"]:
-        demacroedCode = DemacroTop(parsed.content, standardScope)
+        demacroedCode = DemacroTop(parsed.content, outerDefaultRuntimeFrame)
         targetFile = next(args)
-        serialized = demacroedCode.serialize()
+        serialized = demacroedCode.serializeLLQ()
         f = open(targetFile, "w")
         f.write(serialized)
         f.close()

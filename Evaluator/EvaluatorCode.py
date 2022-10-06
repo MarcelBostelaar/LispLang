@@ -22,7 +22,7 @@ def EvalLambda(currentFrame: StackFrame) -> StackFrame:
     applied = head.bind(
         dereference(
             currentFrame.withExecutionState(tailHead)
-        )
+        ), currentFrame
     )
     if applied.canRun():
         old = currentFrame.withExecutionState(
@@ -82,7 +82,7 @@ def Eval(currentFrame: StackFrame) -> Value:
             currentFrame.throwError("Cant evaluate an s expression with 0 items in it")
         if len(currentFrame.executionState.value) == 1:
             # nested single item, pop s expression
-            currentFrame.withExecutionState(currentFrame.executionState.value[0])
+            currentFrame = currentFrame.withExecutionState(currentFrame.executionState.value[0])
             continue
 
         head = currentFrame.executionState.value[0]

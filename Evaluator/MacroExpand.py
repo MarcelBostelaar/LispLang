@@ -18,7 +18,7 @@ def demacroSubelements(currentFrame: StackFrame) -> [Value]:
     Applies the demacro process to all the subelements in the expression, with a new scope
     Top level may not be a macro
     """
-    return [demacroSubelementSingle(currentFrame.child(x)) for x in currentFrame.executionState]
+    return [demacroSubelementSingle(currentFrame.child(x)) for x in currentFrame.executionState.value]
 
 
 def handleMacroInvocation(currentFrame: StackFrame) -> Value:
@@ -40,7 +40,7 @@ def handleMacro(currentFrame: StackFrame) -> Value:
     MustBeKind(currentFrame, callingScope, "Third arg after a macro def is the calling scope holder, must be a name", Kind.QuotedName)
     MustBeKind(currentFrame, body, "Macro body must be a list", Kind.List)
     expandedBody = DemacroTop(currentFrame.child(body))
-    lambdaForm = UserLambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentFrame.captured())
+    lambdaForm = UserLambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentFrame)
     newFrame = currentFrame.addScopedMacroValue(varname.value, lambdaForm)
     return List([macroword, varname, callingScope, inputHolder, expandedBody])\
         .concat(DemacroTop(newFrame.withExecutionState(List(tail))))
@@ -76,7 +76,7 @@ def handleQuotedNameAtHead(currentFrame: StackFrame) -> Value:
     if head.value == SpecialForms.quote.value.keyword:
         # quoted code should NOT be demacroed (so the item following a QUOTE special form)
         [quotewordAndItem, tail] = SpecialFormSlicer(currentFrame, SpecialForms.quote)
-        return List(quotewordAndItem + demacroSubelements(currentFrame.withExecutionState(tail)))
+        return List(quotewordAndItem + demacroSubelements(currentFrame.withExecutionState(List(tail))))
 
     return List(demacroSubelements(currentFrame))
 

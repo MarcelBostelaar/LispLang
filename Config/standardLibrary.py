@@ -1,5 +1,5 @@
 from Evaluator.SupportFunctions import MustBeKind
-from Evaluator.Classes import List, Kind, SystemFunction, Scope, Boolean
+from Evaluator.Classes import List, Kind, SystemFunction, Boolean, StackFrame, StackReturnValue
 
 
 def head(somelist: List):
@@ -32,11 +32,11 @@ standardLibrary = {
 }
 
 
-def makeStandardScope():
-    scope = Scope()
+def makeStartingFrame():
+    frame = StackFrame(StackReturnValue())
     for funcname, func in standardLibrary.items():
-        scope = scope.addValue(funcname, func)
-    return scope
+        frame = frame.addScopedRegularValue(funcname, func)
+    return frame
 
 
-standardScope = makeStandardScope()
+outerDefaultRuntimeFrame = makeStartingFrame()

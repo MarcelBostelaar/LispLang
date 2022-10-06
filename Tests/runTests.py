@@ -1,11 +1,12 @@
+from Evaluator.Classes import RuntimeEvaluationError
 from Evaluator.MacroExpand import DemacroTop
 from main import tokenizeParse
 from termcolor import cprint
 
-from Config.standardLibrary import standardScope
+from Config.standardLibrary import outerDefaultRuntimeFrame
 from Tests.ParseTests import test1Expected
 
-catchErrors = True
+catchErrors = False
 
 
 def compileTest(inputfile, expectedfile, testName):
@@ -16,7 +17,11 @@ def compileTest(inputfile, expectedfile, testName):
             cprint("Exception while executing Tests '" + testName + "'", "red")
             print("")
     else:
-        compileTestInternal(inputfile, expectedfile, testName)
+        try:
+            compileTestInternal(inputfile, expectedfile, testName)
+        except RuntimeEvaluationError:
+            cprint("Runtime error while executing Tests '" + testName + "'", "red")
+            print("")
 
 
 def compileTestInternal(inputfile, expectedfile, testName):
@@ -30,10 +35,10 @@ def compileTestInternal(inputfile, expectedfile, testName):
     parsedexp = tokenizeParse(exp).content
 
 
-    demacroedCode = DemacroTop(parsedinp, standardScope)
+    demacroedCode = DemacroTop(outerDefaultRuntimeFrame.child(parsedinp))
 
-    realSer = demacroedCode.serialize()
-    expSer = parsedexp.serialize()
+    realSer = demacroedCode.serializeLLQ()
+    expSer = parsedexp.serializeLLQ()
 
     if realSer == expSer:
         cprint(testName + " passed", "green")
@@ -54,8 +59,8 @@ def parseTest(inputfile, outputExpected, testName):
         return
     if not parsedinp.content.equals(outputExpected):
         cprint(testName + "failed, expected and parsed value dont match", "red")
-        cprint("Expected:" + outputExpected.serialize(), "red")
-        cprint("Actual  :" + parsedinp.content.serialize(), "red")
+        cprint("Expected:" + outputExpected.serializeLLQ(), "red")
+        cprint("Actual  :" + parsedinp.content.serializeLLQ(), "red")
         print("")
     else:
         cprint(testName + " passed", "green")
