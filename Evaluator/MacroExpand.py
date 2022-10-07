@@ -1,5 +1,5 @@
 import Config.langConfig
-from Evaluator.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, QuotedName, Value
+from Evaluator.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, QuotedName, Value, Reference
 from Config.langConfig import SpecialForms
 from Evaluator.EvaluatorCode import Eval
 from Evaluator.SupportFunctions import toAST, MustBeKind, SpecialFormSlicer
@@ -24,9 +24,10 @@ def demacroSubelements(currentFrame: StackFrame) -> [Value]:
 def handleMacroInvocation(currentFrame: StackFrame) -> Value:
     head = currentFrame.executionState.value[0]
     tail = currentFrame.executionState.value[1:]
-
     lambdaVal: Lambda = currentFrame.retrieveScopedMacroValue(head.value)
-    newFrame = currentFrame.child(sExpression([lambdaVal, QuotedName(Config.langConfig.currentScopeKeyword), List(tail)]))
+    newFrame = currentFrame.captured().withExecutionState(
+        sExpression([lambdaVal, Reference(Config.langConfig.currentScopeKeyword), List(tail)])
+    )
     result = Eval(newFrame)
     if not result.isSerializable():
         currentFrame.throwError("Macro returned something non-serializable (not LLQ)")

@@ -46,37 +46,36 @@ def handleSpecialFormLet(currentFrame: StackFrame):
     return currentFrame.addScopedRegularValue(name.value, value).withExecutionState(tail)
 
 
-def handleSpecialFormList(currentFrame: StackFrame):
-    # treats the list behind it as a list rather than an s expression
-    [[listAtom, snd], tail] = SpecialFormSlicer(currentFrame, SpecialForms.list)
-    MustBeKind(currentFrame, snd, "Item after list must be a list", Kind.sExpression)
-    listMapped, newStackExpression = handleSpecialFormListStep(currentFrame, snd)
-    if newStackExpression is not None:
-        currentFrame = currentFrame.withExecutionState(sExpression([listAtom, sExpression(listMapped)] + tail))
-        newStack = currentFrame.child(newStackExpression)
-        return newStack
-    return currentFrame.withExecutionState(List(listMapped))
-
-
-def handleSpecialFormListStep(currentFrame, snd):
+def handleSpecialFormList(currentFrame):
     """
     Evaluate the items in snd into their fully evaluated form.
     :param currentFrame:
-    :param snd:
     :return:
     """
+    [[listAtom, snd], tail] = SpecialFormSlicer(currentFrame, SpecialForms.list)
+    MustBeKind(currentFrame, snd, "Item after list must be a list", Kind.sExpression)
+
+    #Walk over the snd, save the first instance of a subexpression into new stack expression
+    # and replace with a stack return value in the list, the following expressions as is
     newStackExpression = None
     listMapped = []
     for i in snd.value:
         if i.kind == Kind.sExpression:
-            if newStackExpression is not None:
+            if newStackExpression is None:
                 listMapped.append(StackReturnValue())
                 newStackExpression = i
             else:
                 listMapped.append(i)
         else:
             listMapped.append(dereference(currentFrame.withExecutionState(i)))
-    return listMapped, newStackExpression
+
+    # if a subexpression was found and replaced, make it into a new stackframe, with parent being the updates list
+    if newStackExpression is not None:
+        currentFrame = currentFrame.withExecutionState(sExpression([listAtom, sExpression(listMapped)] + tail))
+        newStack = currentFrame.child(newStackExpression)
+        return newStack
+    #No subexpression found, all subitems are evaluated
+    return currentFrame.withExecutionState(List(listMapped))
 
 
 def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
@@ -96,7 +95,7 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
         # quotes item directly after it
         [[_, snd], tail] = SpecialFormSlicer(currentFrame, SpecialForms.quote)
         newSnd = QuoteCode(currentFrame, snd)
-        return currentFrame.executionState(sExpression([newSnd] + tail))
+        return currentFrame.withExecutionState(sExpression([newSnd] + tail))
 
     if name == SpecialForms.list.value.keyword:
         return handleSpecialFormList(currentFrame)

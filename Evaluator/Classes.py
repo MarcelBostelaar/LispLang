@@ -48,19 +48,22 @@ class List(Value):
     def __init__(self, value):
         super().__init__(value, Kind.List)
 
-    def serializeLLQ(self):
+    def __abstractSerialize__(self, serializeInvocation):
         isString = True
         for i in self.value:
             if i.kind != Kind.Char:
                 isString = False
         if not isString:
             # Not a list of chars, ie its not a string
-            return "[ " + " ".join([x.serializeLLQ() for x in self.value]) + " ]"
+            return "[ " + " ".join([serializeInvocation(x) for x in self.value]) + " ]"
         # Print a list of chars (ie a string) as a string
         return '"' + "".join([__escape_string__(x.value) for x in self.value]) + '"'
 
+    def serializeLLQ(self):
+        return self.__abstractSerialize__(lambda x: x.serializeLLQ())
+
     def errorDumpSerialize(self):
-        return self.serializeLLQ()
+        return self.__abstractSerialize__(lambda x: x.errorDumpSerialize())
 
     def isSerializable(self):
         for i in self.value:
@@ -281,6 +284,10 @@ class UserLambda(Lambda):
 
 class SystemFunction(Lambda):
     """In memory representation of a system function"""
+    def __init__(self, function, bindingsLeft):
+        super().__init__()
+        self.function = function
+        self.bindingsLeft = bindingsLeft
 
     def equals(self, other):
         super(SystemFunction, self).equals(other)
@@ -288,13 +295,10 @@ class SystemFunction(Lambda):
     def canRun(self) -> bool:
         return self.bindingsLeft == 0
 
-    def createFrame(self, parentFrame: StackFrame) -> StackFrame:
-        return parentFrame.child(self)
-
-    def __init__(self, function, bindingsLeft):
-        super().__init__()
-        self.function = function
-        self.bindingsLeft = bindingsLeft
+    def createFrame(self, callingFrame: StackFrame) -> StackFrame:
+        if not self.canRun():
+            callingFrame.throwError("Tried to run a lambda that still needs arguments bound. Engine error.")
+        return callingFrame.child(self.function(callingFrame))
 
     def bind(self, argument, callingFrame):
         if self.bindingsLeft <= 0:
@@ -344,7 +348,7 @@ class StackFrame(Value):
     def retrieveScopedRegularValue(self, name):
         #Do not check parents, because parent can be a non-captured outer scope
         if name == Config.langConfig.currentScopeKeyword:
-            return self
+            return self.captured()
         if not self.hasScopedRegularValue(name):
             if name not in self.__scopedNames__.keys():
                 self.throwError("Tried to retrieve regular value " + name + ". Value was not found in scope.")
@@ -372,7 +376,7 @@ class StackFrame(Value):
     def captured(self) -> StackFrame:
         """Returns a new stack that contains all capturable data, flattened into a single dimension (no parent), so no captured handlers.
         This is then used to execute user created functions, or closures, later on"""
-        cprint("Function Captured on the stackframe isn't implemented, returns unaltered frame.", color="red")
+        cprint("Warning: Function Captured on the stackframe doesnt do handler removal yet.", color="cyan")
         #TODO implement
         copied = self.__copy__()
         copied.parent = None
@@ -432,6 +436,9 @@ class StackFrame(Value):
 
     def errorDumpSerialize(self):
         return Config.langConfig.currentScopeKeyword
+
+    def debugStateToString(self):
+        return self.executionState.errorDumpSerialize()
 
 
 class RuntimeEvaluationError(Exception):
