@@ -1,28 +1,15 @@
-[
-    macro ` [followingList] [
-        [list [list [followinglist]]]
-    ]
-]
-//random ass comment
-[
-    macro if [condition _then option1 _else option2] [
-        [list [cond condition option1 option2]]
-    ]
+letf x y = [
+    ignore [print y]
+    sum y 4
 ]
 
-[
-    macro func [somename arguments body] /* inline comments*/ [
-        [let x [some calculation]]
-        [list [let somename [lambda arguments body]]]
-    ]
+/* seed -> input (many) -> continue<seed'>/stop<value> */
+letf printhandler state value = [
+    cond [[isString value]]
+        [continue [concat state value]]
+        [stop state]
 ]
-
-[
-    func somename [arg1 arg2] [
-        [print arg1]
-        [print arg2]
-        [sum [list [1,2,3,4]]]
-    ]
-]
-
-[somename "some" "string\n"]
+/*handle effectfullCode [list [handler1 handler2 etc]] stateSeed*/
+//handlers must have compatible/identical state types, and return a continue or stop
+let someResult = handle [x 3] [list [printhandler]] ""
+//someResult = List [normalReturnValue handledStateResult]

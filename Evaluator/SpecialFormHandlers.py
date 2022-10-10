@@ -7,23 +7,21 @@ def handleSpecialFormCond(currentFrame: StackFrame):
     # eval condition, if true, return true unevaluated, else return falsepath unevaluated
     [[condAtom, condition, truePath, falsePath], tail] = \
         SpecialFormSlicer(currentFrame, SpecialForms.cond)
-    if condition.kind == Kind.sExpression:
-        x = sExpression([condAtom, StackReturnValue(), truePath, falsePath] + tail)
-        currentFrame = currentFrame.withExecutionState(x)
-        newFrame = currentFrame.child(condition)
-        return newFrame
-    evaluated = dereference(currentFrame.withExecutionState(condition))
-    MustBeKind(currentFrame, evaluated, "Tried to evaluate an conditional, value to evaluate not a boolean",
+    if not currentFrame.isFullyEvaluated(1):
+        return currentFrame.SubEvaluate(1)
+    MustBeKind(currentFrame, condition, "Tried to evaluate an conditional, value to evaluate not a boolean",
                Kind.Boolean)
-    if evaluated.value:
-        return currentFrame.withExecutionState(truePath)
-    return currentFrame.withExecutionState(falsePath)
+    if condition.value:
+        path = truePath
+    else:
+        path = falsePath
+    return currentFrame.withExecutionState(sExpression([path] + tail))
 
 
 def handleSpecialFormLambda(currentFrame: StackFrame):
     [[_, args, body], rest] = SpecialFormSlicer(currentFrame, SpecialForms.Lambda)
     lambdaerr = "First arg after lambda must be a flat list/s expression of names"
-    MustBeKind(currentFrame, args, lambdaerr, Kind.sExpression, )
+    MustBeKind(currentFrame, args, lambdaerr, Kind.sExpression)
     [MustBeKind(currentFrame, x, lambdaerr, Kind.Reference) for x in args.value]
     MustBeKind(currentFrame, body, "Body of a lambda must be an s expression or a single name",
                Kind.sExpression, Kind.Reference)
@@ -35,14 +33,8 @@ def handleSpecialFormLambda(currentFrame: StackFrame):
 def handleSpecialFormLet(currentFrame: StackFrame):
     [[let, name, value], tail] = SpecialFormSlicer(currentFrame, SpecialForms.let)
     MustBeKind(currentFrame, name, "The first arg after a let must be a name", Kind.Reference)
-    if value.kind == Kind.sExpression:
-        # Item needs to be further evaluated
-        x = sExpression([let, name, StackReturnValue()] + tail.value)
-        updatedParent = currentFrame.withExecutionState(x)  # replace item with return value placeholder
-        newFrame = updatedParent.child(value)  # create child stack to calculate result
-        return newFrame
-    else:
-        value = dereference(currentFrame.withExecutionState(value))  # retrieve the raw value
+    if not currentFrame.isFullyEvaluated(2):
+        return currentFrame.SubEvaluate(2)
     return currentFrame.addScopedRegularValue(name.value, value).withExecutionState(tail)
 
 
@@ -78,6 +70,37 @@ def handleSpecialFormList(currentFrame):
     return currentFrame.withExecutionState(List(listMapped))
 
 
+def verifyHandlerQuotekeyValuePairs(callingFrame: StackFrame, keyValue):
+    errMessage = "Handlers must be key value pairs of a quoted name and a function"
+
+    MustBeKind(callingFrame, keyValue, errMessage, Kind.List)
+    for i in keyValue.value:
+        MustBeKind(callingFrame, i, errMessage, Kind.List)
+        if len(i.value) != 2:
+            callingFrame.throwError(errMessage)
+        MustBeKind(callingFrame, i.value[0], errMessage, Kind.QuotedName)
+        MustBeKind(callingFrame, i.value[0], errMessage, Kind.Lambda)
+
+
+def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
+    [[handlerWord, codeToEvaluate, handlerQuotekeyValuePairs, stateSeed], tail] = SpecialFormSlicer(currentFrame, SpecialForms.handle)
+
+    if not currentFrame.isFullyEvaluated(2):#handlerQuotekeyValuePairs
+        return currentFrame.SubEvaluate(2)
+    if not currentFrame.isFullyEvaluated(3):#stateSeed
+        return currentFrame.SubEvaluate(3)
+
+    verifyHandlerQuotekeyValuePairs(currentFrame, handlerQuotekeyValuePairs)
+
+    old = currentFrame.withExecutionState(sExpression([StackReturnValue()] + tail))
+    branchPoint = old.child(HandlerBranchPoint())
+    newFrame = old.child(codeToEvaluate)
+    for i in handlerQuotekeyValuePairs.value:
+        newFrame = newFrame.addHandler(i.value[0].value, i.value[1])
+    newFrame.withHandlerState(stateSeed)
+    return newFrame
+
+
 def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
     name = currentFrame.executionState.value[0].value
     if name == SpecialForms.Lambda.value.keyword:
@@ -102,5 +125,8 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
 
     if name == SpecialForms.cond.value.keyword:
         return handleSpecialFormCond(currentFrame)
+
+    if name == SpecialForms.handle.value.keyword:
+        return handleSpecialFormHandle(currentFrame)
 
     currentFrame.throwError("Unknown special form (engine bug)")

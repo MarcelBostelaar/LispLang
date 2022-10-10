@@ -12,6 +12,8 @@ def c(keyword, length):
 
 
 currentScopeKeyword = "currentScope"
+continueKeyword = "continue"
+stopKeyword = "stop"
 
 reservedWords = [currentScopeKeyword, "true", "false"]
 
@@ -30,5 +32,5 @@ class SpecialForms(Enum):
     Lambda = c("lambda", 3) #lambda args body
     cond = c("cond", 4) #cond bool truepath falsepath
     ignore = c("ignore", 1) #ignore (somevalue or function)
-
+    handle = c("handle", 3) #handle effectfullCode '[[handlername @handler1] [handlername2 @handler2] etc]] stateSeed
 

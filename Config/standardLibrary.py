@@ -1,5 +1,6 @@
+from Config.langConfig import continueKeyword, stopKeyword
 from Evaluator.SupportFunctions import MustBeKind
-from Evaluator.Classes import List, Kind, SystemFunction, Boolean, StackFrame, StackReturnValue, Number
+from Evaluator.Classes import List, Kind, SystemFunction, Boolean, StackFrame, StackReturnValue, Number, ContinueStop
 
 
 def head(somelist: List, callingFrame: StackFrame):
@@ -30,13 +31,21 @@ def sum(A, B, callingFrame: StackFrame):
     return Number(A.value + B.value)
 
 
+def continueStop(isContinue):
+    def internal(value, callingFrame: StackFrame):
+        return ContinueStop(isContinue, value)
+    return internal
+
+
 
 standardLibrary = {
     "head": SystemFunction(head, 1),
     "tail": SystemFunction(tail, 1),
     "concat": SystemFunction(concat, 2),
     "equals": SystemFunction(equals, 2),
-    "sum": SystemFunction(sum, 2)
+    "sum": SystemFunction(sum, 2),
+    continueKeyword: SystemFunction(continueStop(True), 1),
+    stopKeyword: SystemFunction(continueStop(False), 1)
 }
 
 

@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import functools
-from abc import ABC
 from enum import Enum
 
 from termcolor import cprint
 
 import Config.langConfig
-from Config.langConfig import currentScopeKeyword
+from Evaluator.SupportFunctions import dereference
 
 
 class Kind(Enum):
@@ -21,6 +20,9 @@ class Kind(Enum):
     Boolean = 8
     Scope = 9
     StackReturnValue = 10
+    ContinueStop = 11
+    UnfinishedHandlerInvocation = 12
+    HandleBranchPoint = 13
 
 
 class Value:
@@ -131,6 +133,31 @@ class Char(Value):
         return self.value == other.value
 
 
+class ContinueStop(Value):
+    def __init__(self, isContinue: bool, value: Value):
+        super().__init__(value, Kind.ContinueStop)
+        self.isContinue = isContinue
+
+    def __unRun__(self) -> Value:
+        keyword = Config.langConfig.continueKeyword if self.isContinue else Config.langConfig.stopKeyword
+        return List([Reference(keyword), self.value])
+
+    def isSerializable(self):
+        return self.value.isSerializable()
+
+    def serializeLLQ(self):
+        self.__unRun__().serializeLLQ()
+
+    def errorDumpSerialize(self):
+        self.__unRun__().errorDumpSerialize()
+
+    def equals(self, other):
+        if other.kind == self.kind:
+            if other.isContinue == self.isContinue:
+                return other.value.equals(self.value)
+        return False
+
+
 class Boolean(Value):
     def __init__(self, value):
         if value == "true":
@@ -224,9 +251,12 @@ class StackReturnValue(Value):
         return "StackReturnValue"
 
 
-
 class Lambda(Value):
     """In memory representation of a function"""
+
+    def errorDumpSerialize(self):
+        raise NotImplementedError("Abstract class")
+
     def __init__(self):
         super().__init__(None, Kind.Lambda)
 
@@ -246,7 +276,6 @@ class Lambda(Value):
 
 class UserLambda(Lambda):
     """In memory representation of a function"""
-    #TODO fix current scope usage
     def __init__(self, bindings, body, boundFrame: StackFrame, bindIndex=0):
         super().__init__()
         self.__bindings__ = bindings  # function arguments
@@ -272,8 +301,8 @@ class UserLambda(Lambda):
             callingFrame.throwError("Tried to run a lambda that still needs arguments bound. Engine error.")
         #Break readonly rule for once, to enable captured scope to work.
         newFrame = self.__boundFrame__.__copy__()
-        newFrame.parent = callingFrame
-        return newFrame.withExecutionState(self.__body__)
+        #callingFrame is parent to allow handler access
+        return callingFrame.child(self.__body__)
 
     def equals(self, other):
         return super(UserLambda, self).equals(other)
@@ -309,6 +338,76 @@ class SystemFunction(Lambda):
         return "SystemFunction"
 
 
+class HandlerBranchPoint(Value):
+    def __init__(self, handlerDepth: int):
+        super().__init__(None, Kind.HandleBranchPoint)
+        self.continueStack = continueStack
+        self.handlerDepth = handlerDepth
+
+    def Continue(self, value: Value):
+        """
+        Fixes the handlerstate
+        :param value:
+        :return:
+        """
+        raise NotImplementedError("")
+
+    def errorDumpSerialize(self):
+        raise NotImplementedError("")
+
+    def equals(self, other):
+        raise NotImplementedError("")
+
+
+class UnfinishedHandlerInvocation(Value):
+    """In memory representation of an unfinished handler invocation"""
+    def __init__(self, name: str, argAmount: int):
+        super().__init__(None, Kind.UnfinishedHandlerInvocation)
+        self.name = name
+        """The handler name it references"""
+        self.argAmount = argAmount
+        """Total amount of args needed for invocation"""
+        self.args = []
+
+    def bind(self, argument) -> UnfinishedHandlerInvocation:
+        copy = UnfinishedHandlerInvocation(self.name, self.argAmount)
+        copy.args.append(argument)
+        return copy
+
+    def canRun(self, callingFrame: StackFrame) -> bool:
+        realLength = len(self.args)
+        if realLength > self.argAmount:
+            callingFrame.throwError("Too many args added to the handler invocation")
+        return realLength == self.argAmount
+
+    def createFrame(self, callingFrame: StackFrame) -> StackFrame:
+        """Returns a new stack in which to run the function code, with the calling frame as parent"""
+        if not self.canRun(callingFrame):
+            callingFrame.throwError(f"Not enough arguments added for invocation of '{self.name}'.")
+        if not callingFrame.hasHandler(self.name):
+            callingFrame.throwError(f"Tried to handle effectfull function '{self.name}'"
+                                    f", but no handler for it was found.")
+
+        handlerFunc: Lambda = callingFrame.getHandler(self.name)
+        handlerFunc = handlerFunc.bind(callingFrame.getHandlerState(), callingFrame)
+        for arg in self.args:
+            if handlerFunc.canRun():
+                callingFrame.throwError(f"Too many arguments exist in the handler '{self.name}' invocation.")
+            handlerFunc = handlerFunc.bind(arg, callingFrame)
+
+        if not handlerFunc.canRun():
+            callingFrame.throwError(f"Too few arguments for handler '{self.name}' invocation")
+
+        handleFuncRunningFrame = handlerFunc.createFrame(callingFrame)
+        return handleFuncRunningFrame
+
+    def errorDumpSerialize(self):
+        pass
+
+    def equals(self, other):
+        raise NotImplementedError("")
+
+
 class VarType(Enum):
     Regular = 1
     Macro = 2
@@ -316,6 +415,7 @@ class VarType(Enum):
 
 class StackFrame(Value):
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
+
     def __init__(self, executionState):
         super().__init__(None, Kind.Scope)
         self.executionState = executionState
@@ -327,7 +427,12 @@ class StackFrame(Value):
         self.__scopedMacros__ = {}
         self.__handlerSet__ = {}
         """The handlers in this stack frame, not those of parents"""
+        self.__handlerState__ = [None]
+        """A shared state object containing the state of the handler. 
+        This is the only mutable and shared part of the entire interpreter/frame data structure.
+        Its shared between stacks with identical handlers to allow for cross-stack state changes."""
         self.__childReturnValue__ = None
+        self.__handlerDepth__ = None
 
     def child(self, executionState: Value) -> StackFrame:
         # explicitly take over the full scoped names, values, macros from the parents. Stacks exist only for return
@@ -359,7 +464,7 @@ class StackFrame(Value):
 
     def withExecutionState(self, executionState: Value) -> StackFrame:
         copy = self.__copy__()
-        copy.executionState = executionState
+        copy.executionState[0] = executionState
         return copy
 
     def __stackTrace__(self):
@@ -374,7 +479,8 @@ class StackFrame(Value):
         raise RuntimeEvaluationError("Runtime error")
 
     def captured(self) -> StackFrame:
-        """Returns a new stack that contains all capturable data, flattened into a single dimension (no parent), so no captured handlers.
+        """Returns a new stack that contains all capturable data, flattened into a single dimension (no parent),
+        so no captured handlers.
         This is then used to execute user created functions, or closures, later on"""
         cprint("Warning: Function Captured on the stackframe doesnt do handler removal yet.", color="cyan")
         #TODO implement
@@ -389,6 +495,8 @@ class StackFrame(Value):
         newcopy.__scopedMacros__ = self.__scopedMacros__
         newcopy.__handlerSet__ = self.__handlerSet__.copy()
         newcopy.__childReturnValue__ = self.__childReturnValue__
+        newcopy.__handlerState__ = self.__handlerState__
+        newcopy.__handlerDepth__ = self.__handlerDepth__
         newcopy.parent = self.parent
         return newcopy
 
@@ -434,11 +542,84 @@ class StackFrame(Value):
         copy.__scopedValues__[name] = value
         return copy
 
+    def addHandler(self, name, value) -> StackFrame:
+        self.checkReservedKeyword(name)
+        copy = self.__copy__()
+        copy.__handlerSet__[name] = value
+
+        if copy.__handlerDepth__ is not None:
+            if copy.parent is None:
+                copy.__handlerDepth__ = 0
+            else:
+                copy.__handlerDepth__ = copy.parent.getNextHandlerDepth()
+
+        return copy
+
+    def getNextHandlerDepth(self):
+        if self.__handlerDepth__ is not None:
+            return self.__handlerDepth__ + 1
+        if self.parent is None:
+            return 0
+        return self.parent.getNextHandlerDepth()
+
+    def withHandlerState(self, state) -> StackFrame:
+        #Handler state is the only non-functional aspect of the stackframe, to enable statefull programming
+        self.__handlerState__[0] = state
+        return self
+
+    def getHandlerState(self) -> Value|None:
+        return self.__handlerState__[0]
+
     def errorDumpSerialize(self):
         return Config.langConfig.currentScopeKeyword
 
     def debugStateToString(self):
         return self.executionState.errorDumpSerialize()
+
+    def isFullyEvaluated(self, itemIndex) -> bool:
+        """
+        Returns a boolean indicating whether an item at a given index is fully evaluated
+        :param itemIndex: Zero based index of the item
+        :return: Boolean
+        """
+        if self.executionState.kind != Kind.sExpression:
+            self.throwError("Tried to evaluate a subitem of a value that isnt an s expression. Engine error.")
+        if itemIndex >= len(self.executionState):
+            self.throwError("Tried to evaluate a subitem that is out of range. Engine error.")
+        return self.executionState[itemIndex].kind not in [Kind.sExpression, Kind.StackReturnValue, Kind.Reference]
+
+    def SubEvaluate(self, itemIndex) -> StackFrame:
+        """
+        Evaluates an item in a given location via a new stackframe, and dereferences any indirection.
+        For use in special forms
+        :param itemIndex:
+        :return:
+        """
+        if self.isFullyEvaluated(itemIndex):
+            self.throwError("Item is already fully evaluated. Engine error.")
+        item = self.executionState[itemIndex]
+        if item.kind == Kind.sExpression:
+            oldFrame = self.withExecutionState(sExpression([
+                self.executionState[:itemIndex] + [StackReturnValue()] + self.executionState[itemIndex + 1:]
+            ]))
+            newStack = oldFrame.child(item)
+            return newStack
+
+        #its indirection
+        trueValue = dereference(self.withExecutionState(item))
+        return self.withExecutionState(sExpression([
+                self.executionState[:itemIndex] + [trueValue] + self.executionState[itemIndex + 1:]
+            ]))
+
+    def hasHandler(self, name):
+        if name in self.__handlerSet__.keys():
+            return True
+        if self.parent is not None:
+            return self.parent.hasHandler(name)
+        return False
+
+    def equals(self, other):
+        self.throwError("Cannot equality compare stackframes (yet)")
 
 
 class RuntimeEvaluationError(Exception):

@@ -1,5 +1,5 @@
 from Evaluator.Classes import sExpression, Kind, StackFrame, Value, \
-    StackReturnValue, Lambda
+    StackReturnValue, Lambda, List
 from Evaluator.SpecialFormHandlers import ExecuteSpecialForm
 from Evaluator.SupportFunctions import dereference, isSpecialFormKeyword
 
@@ -7,23 +7,15 @@ from Evaluator.SupportFunctions import dereference, isSpecialFormKeyword
 
 
 def EvalLambda(currentFrame: StackFrame) -> StackFrame:
+    if not currentFrame.isFullyEvaluated(1):
+        return currentFrame.SubEvaluate(1)
     head: Lambda = currentFrame.executionState.value[0]
     tail = currentFrame.executionState.value[1:]
     tailHead = tail[0]
     trueTail = tail[1:]
 
-    if tailHead.kind == Kind.sExpression:
-        old = currentFrame.withExecutionState(
-            sExpression([head, StackReturnValue()] + trueTail)
-        )
-        new = old.child(tailHead)
-        return new
+    applied = head.bind(tailHead, currentFrame)
 
-    applied = head.bind(
-        dereference(
-            currentFrame.withExecutionState(tailHead)
-        ), currentFrame
-    )
     if applied.canRun():
         old = currentFrame.withExecutionState(
             sExpression([StackReturnValue()] + trueTail)
@@ -36,6 +28,24 @@ def EvalLambda(currentFrame: StackFrame) -> StackFrame:
         )
 
 
+def EvalUnfinishedHandlerInvocation(currentFrame):
+    if not currentFrame.isFullyEvaluated(1):
+        return currentFrame.SubEvaluate(1)
+    head = currentFrame.executionState.value[0]
+    tail = currentFrame.executionState.value[1:]
+    tailHead = tail[0]
+    trueTail = tail[1:]
+
+    applied = head.bind(tailHead, currentFrame)
+
+    if not applied.canRun(currentFrame):
+        return currentFrame.withExecutionState(
+            sExpression([applied] + trueTail)
+        )
+
+    #get
+
+
 def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
     head = currentFrame.executionState.value[0]
     tail = currentFrame.executionState.value[1:]
@@ -44,7 +54,8 @@ def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
         head = currentFrame.retrieveScopedRegularValue(head.value)
         expression = sExpression([head] + tail)
         return currentFrame.withExecutionState(expression)
-    # TODO check for handlers here
+    if currentFrame.hasScopedMacroValue(head.value):
+        currentFrame.throwError("Macro that isnt compiled out found")
     if isSpecialFormKeyword(head.value):
         return ExecuteSpecialForm(currentFrame)
 
@@ -61,6 +72,9 @@ def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
 
     if currentFrame.parent is None:
         return True, resultValue
+    handlerState = currentFrame.getHandlerState()
+    if handlerState is not None:
+        return False, currentFrame.parent.withChildReturnValue(List([resultValue, handlerState]))
     return False, currentFrame.parent.withChildReturnValue(resultValue)
 
 
@@ -101,6 +115,10 @@ def Eval(currentFrame: StackFrame) -> Value:
 
         if head.kind == Kind.Lambda:
             currentFrame = EvalLambda(currentFrame)
+            continue
+
+        if head.kind == Kind.UnfinishedHandlerInvocation:
+            currentFrame = EvalUnfinishedHandlerInvocation(currentFrame)
             continue
 
         # All other options are wrong
