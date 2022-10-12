@@ -33,8 +33,8 @@ def runtimeTestInternal(inputfile, expectedfile, testName):
     parsedexp = tokenizeParse(exp).content
 
 
-    ranCode = Eval(outerDefaultRuntimeFrame.child(toAST(parsedinp)))
-    evaluatedExpected = Eval(outerDefaultRuntimeFrame.child(toAST(parsedexp)))
+    ranCode = Eval(outerDefaultRuntimeFrame.createChild(toAST(parsedinp)))
+    evaluatedExpected = Eval(outerDefaultRuntimeFrame.createChild(toAST(parsedexp)))
 
     realSer = ranCode.serializeLLQ()
     expSer = evaluatedExpected.serializeLLQ()

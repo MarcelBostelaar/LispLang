@@ -1,5 +1,7 @@
+import Config.langConfig
 from Config.langConfig import SpecialForms
 from Evaluator.Classes import Kind, sExpression, Reference, StackFrame, Value, List, QuotedName
+from Evaluator.HandlerStateRegistry import HandlerStateSingleton
 
 
 def toAST(LLQ):
@@ -21,13 +23,20 @@ def dereference(currentFrame: StackFrame) -> Value:
     if item.kind == Kind.Reference:
         if currentFrame.hasScopedRegularValue(item.value):
             return currentFrame.retrieveScopedRegularValue(item.value)
-        # TODO check for handlers here
         if isSpecialFormKeyword(item.value):
             currentFrame.throwError("Tried to execute special form, but item is a singular reference, "
                                     "not in an s expression or on its own.")
         currentFrame.throwError("Reference not found in scope")
     if item.kind == Kind.StackReturnValue:
         return currentFrame.getChildReturnValue()
+    if item.kind == Kind.HandleInProgress:
+        stateValue = HandlerStateSingleton.retrieveState(item.handlerID)
+        childReturnValue = currentFrame.getChildReturnValue()
+        if childReturnValue is None:
+            raise NotImplementedError("Return unit or none")
+        returnValue = List([childReturnValue, stateValue])
+        HandlerStateSingleton.unregisterHandlerFrame(item.handlerID)
+        return returnValue
     #All other cases, return value as is.
     return item
 
@@ -55,7 +64,7 @@ def QuoteCode(frame: StackFrame, expression):
         return List([QuoteCode(frame, x) for x in expression.value])
     if expression.kind == Kind.Reference:
         return QuotedName(expression.value)
-    if expression.kind in [Kind.List, Kind.Lambda, Kind.Scope]:
+    if expression.kind not in [Kind.Char, Kind.Number, Kind.Boolean]:
         frame.throwError("Engine error, cannot be quoted, in rewrite dont distinguish s expressions and lists")
     return expression
 
@@ -66,3 +75,13 @@ def SpecialFormSlicer(frame: StackFrame, formConfig: SpecialForms):
         frame.throwError("Special form " + frame.executionState.value[0].value + " must have at least "
                          + str(length) + " items arguments, only has " + str(len(frame.executionState.value)))
     return [frame.executionState.value[:length], frame.executionState.value[length:]]
+
+
+def checkReservedKeyword(callingFrame: StackFrame, name):
+    if name in Config.langConfig.reservedWords:
+        callingFrame.throwError("Tried to override the reserved keyword '" + name + "'. Now allowed.")
+
+
+def escape_string(string):
+    print("TODO implement string escaping")  # todo
+    return string

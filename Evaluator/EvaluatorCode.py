@@ -20,7 +20,7 @@ def EvalLambda(currentFrame: StackFrame) -> StackFrame:
         old = currentFrame.withExecutionState(
             sExpression([StackReturnValue()] + trueTail)
         )
-        new = applied.createFrame(old)
+        new = applied.createEvaluationFrame(old)
         return new
     else:
         return currentFrame.withExecutionState(
@@ -63,18 +63,13 @@ def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
 
 
 def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
-    if currentFrame.executionState.kind == Kind.Reference:
+    if currentFrame.executionState.kind in [Kind.Reference, Kind.HandleInProgress, Kind.StackReturnValue]:
         resultValue = dereference(currentFrame)
-    elif currentFrame.executionState.kind == Kind.StackReturnValue:
-        resultValue = currentFrame.getChildReturnValue()
     else:
         resultValue = currentFrame.executionState
 
     if currentFrame.parent is None:
         return True, resultValue
-    handlerState = currentFrame.getHandlerState()
-    if handlerState is not None:
-        return False, currentFrame.parent.withChildReturnValue(List([resultValue, handlerState]))
     return False, currentFrame.parent.withChildReturnValue(resultValue)
 
 
@@ -110,7 +105,7 @@ def Eval(currentFrame: StackFrame) -> Value:
             old = currentFrame.withExecutionState(
                 sExpression([StackReturnValue()] + tail)
             )
-            currentFrame = old.child(head)
+            currentFrame = old.createChild(head)
             continue
 
         if head.kind == Kind.Lambda:

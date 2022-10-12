@@ -32,7 +32,7 @@ def compileTestInternal(inputfile, expectedfile, testName):
     parsedexp = tokenizeParse(exp).content
 
 
-    demacroedCode = DemacroTop(outerDefaultRuntimeFrame.child(parsedinp))
+    demacroedCode = DemacroTop(outerDefaultRuntimeFrame.createChild(parsedinp))
 
     realSer = demacroedCode.serializeLLQ()
     expSer = parsedexp.serializeLLQ()

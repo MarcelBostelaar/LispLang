@@ -1,5 +1,7 @@
 from Config.langConfig import SpecialForms
-from Evaluator.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List
+from Evaluator.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandlerFrame, \
+    HandleInProgress
+from Evaluator.HandlerStateRegistry import HandlerStateSingleton
 from Evaluator.SupportFunctions import dereference, MustBeKind, SpecialFormSlicer, QuoteCode
 
 
@@ -26,7 +28,7 @@ def handleSpecialFormLambda(currentFrame: StackFrame):
     MustBeKind(currentFrame, body, "Body of a lambda must be an s expression or a single name",
                Kind.sExpression, Kind.Reference)
     return currentFrame.withExecutionState(
-        sExpression([UserLambda([z.value for z in args.value], body, currentFrame)] + rest)
+        sExpression([UserLambda([z.value for z in args.value], body, currentFrame.currentScope)] + rest)
     )
 
 
@@ -64,7 +66,7 @@ def handleSpecialFormList(currentFrame):
     # if a subexpression was found and replaced, make it into a new stackframe, with parent being the updates list
     if newStackExpression is not None:
         currentFrame = currentFrame.withExecutionState(sExpression([listAtom, sExpression(listMapped)] + tail))
-        newStack = currentFrame.child(newStackExpression)
+        newStack = currentFrame.createChild(newStackExpression)
         return newStack
     #No subexpression found, all subitems are evaluated
     return currentFrame.withExecutionState(List(listMapped))
@@ -92,13 +94,27 @@ def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
 
     verifyHandlerQuotekeyValuePairs(currentFrame, handlerQuotekeyValuePairs)
 
-    old = currentFrame.withExecutionState(sExpression([StackReturnValue()] + tail))
-    branchPoint = old.child(HandlerBranchPoint())
-    newFrame = old.child(codeToEvaluate)
+    #register the handler ID
+    handlerID = HandlerStateSingleton.registerHandlerFrame(stateSeed)
+
+    #Create the special stack return value inprogressvalue
+    inProgressValue = HandleInProgress(handlerID)
+    #current frame with handle invocation replaced with the stack return value
+    newParentFrame = currentFrame\
+        .withExecutionState(sExpression([inProgressValue] + tail))
+
+    newHandler = HandlerFrame(handlerID, newParentFrame)
+    newHandler.parent = currentFrame.closestHandlerFrame
+
     for i in handlerQuotekeyValuePairs.value:
-        newFrame = newFrame.addHandler(i.value[0].value, i.value[1])
-    newFrame.withHandlerState(stateSeed)
-    return newFrame
+        newHandler = newHandler.addHandler(currentFrame, i.value[0].value, i.value[1])
+
+    #Subevaluation stack with new handler added
+    evaluationFrame = newParentFrame\
+        .createChild(codeToEvaluate)\
+        .withHandlerFrame(newHandler)
+
+    return evaluationFrame
 
 
 def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:

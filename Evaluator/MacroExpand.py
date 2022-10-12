@@ -1,5 +1,5 @@
 import Config.langConfig
-from Evaluator.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, QuotedName, Value, Reference
+from Evaluator.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, Value, Reference
 from Config.langConfig import SpecialForms
 from Evaluator.EvaluatorCode import Eval
 from Evaluator.SupportFunctions import toAST, MustBeKind, SpecialFormSlicer
@@ -18,16 +18,15 @@ def demacroSubelements(currentFrame: StackFrame) -> [Value]:
     Applies the demacro process to all the subelements in the expression, with a new scope
     Top level may not be a macro
     """
-    return [demacroSubelementSingle(currentFrame.child(x)) for x in currentFrame.executionState.value]
+    return [demacroSubelementSingle(currentFrame.createChild(x)) for x in currentFrame.executionState.value]
 
 
 def handleMacroInvocation(currentFrame: StackFrame) -> Value:
     head = currentFrame.executionState.value[0]
     tail = currentFrame.executionState.value[1:]
     lambdaVal: Lambda = currentFrame.retrieveScopedMacroValue(head.value)
-    newFrame = currentFrame.captured().withExecutionState(
-        sExpression([lambdaVal, Reference(Config.langConfig.currentScopeKeyword), List(tail)])
-    )
+    newFrame = StackFrame(sExpression([lambdaVal, Reference(Config.langConfig.currentScopeKeyword), List(tail)]))
+    newFrame.currentScope = currentFrame.currentScope
     result = Eval(newFrame)
     if not result.isSerializable():
         currentFrame.throwError("Macro returned something non-serializable (not LLQ)")
@@ -40,8 +39,8 @@ def handleMacro(currentFrame: StackFrame) -> Value:
     MustBeKind(currentFrame, inputHolder, "Second arg after a macro def is the input holder, must be a name", Kind.QuotedName)
     MustBeKind(currentFrame, callingScope, "Third arg after a macro def is the calling scope holder, must be a name", Kind.QuotedName)
     MustBeKind(currentFrame, body, "Macro body must be a list", Kind.List)
-    expandedBody = DemacroTop(currentFrame.child(body))
-    lambdaForm = UserLambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentFrame)
+    expandedBody = DemacroTop(currentFrame.createChild(body))
+    lambdaForm = UserLambda([callingScope.value, inputHolder.value], toAST(expandedBody), currentFrame.currentScope)
     newFrame = currentFrame.addScopedMacroValue(varname.value, lambdaForm)
     return List([macroword, varname, callingScope, inputHolder, expandedBody])\
         .concat(DemacroTop(newFrame.withExecutionState(List(tail))))
@@ -50,8 +49,8 @@ def handleMacro(currentFrame: StackFrame) -> Value:
 def handleLet(currentFrame: StackFrame) -> Value:
     [[letword, varname, body], tail] = SpecialFormSlicer(currentFrame, SpecialForms.let)
     MustBeKind(currentFrame, varname, "The first arg after a let must be a name", Kind.QuotedName)
-    expandedBody = DemacroTop(currentFrame.child(body))
-    createdValue = Eval(currentFrame.child(toAST(expandedBody)))
+    expandedBody = DemacroTop(currentFrame.createChild(body))
+    createdValue = Eval(currentFrame.createChild(toAST(expandedBody)))
     newFrame = currentFrame.addScopedRegularValue(varname.value, createdValue)
     return List([letword, varname, expandedBody])\
         .concat(DemacroTop(newFrame.withExecutionState(List(tail))))
@@ -106,8 +105,6 @@ def handleNotAList(currentFrame: StackFrame) -> Value:
 def DemacroTop(currentFrame: StackFrame) -> Value:
     """
     Demacroes a given piece of code
-    :param expression: LLQ of code
-    :param currentScope: Compile time scope
     :return: LLQ of demacroed code
     """
     if currentFrame.executionState.kind != Kind.List:
