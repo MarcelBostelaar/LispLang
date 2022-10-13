@@ -47,7 +47,7 @@ def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
 def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
     if currentFrame.executionState.kind in [Kind.Reference, Kind.HandleInProgress, Kind.StackReturnValue]:
         resultValue = dereference(currentFrame)
-    if currentFrame.executionState.kind == Kind.HandleBranchPoint:
+    elif currentFrame.executionState.kind == Kind.HandleBranchPoint:
         raise NotImplementedError("")
         #TODO if its continue path is none, treat as a stack return value, just pass along child value
         #TODO if it has a continue branch, check if its continue or stop, if continue, append contained value in new stack to continue,
@@ -67,6 +67,8 @@ def Eval(currentFrame: StackFrame) -> Value:
     """
     # continue statements used to achieve tail call optimisation, and to keep stack usage to a minimum
     while True:
+        # print("----\n")
+        # currentFrame.__stackTrace__()
         if currentFrame.executionState.kind != Kind.sExpression:
             programFinished, returnValue = EvalHandleTopLevelValue(currentFrame)
             if programFinished:

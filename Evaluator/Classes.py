@@ -4,8 +4,8 @@ import functools
 from enum import Enum
 from termcolor import cprint
 import Config.langConfig
+from Evaluator import SupportFunctions
 from Evaluator.HandlerStateRegistry import HandlerStateSingleton
-from Evaluator.SupportFunctions import dereference, checkReservedKeyword, escape_string
 
 
 class Kind(Enum):
@@ -62,7 +62,7 @@ class List(Value):
             # Not a list of chars, ie its not a string
             return "[ " + " ".join([serializeInvocation(x) for x in self.value]) + " ]"
         # Print a list of chars (ie a string) as a string
-        return '"' + "".join([escape_string(x.value) for x in self.value]) + '"'
+        return '"' + "".join([SupportFunctions.escape_string(x.value) for x in self.value]) + '"'
 
     def serializeLLQ(self):
         return self.__abstractSerialize__(lambda x: x.serializeLLQ())
@@ -118,7 +118,7 @@ class Char(Value):
         super().__init__(value, Kind.Char)
 
     def serializeLLQ(self):
-        return 'c"' + escape_string(self.value) + '"'
+        return 'c"' + SupportFunctions.escape_string(self.value) + '"'
 
     def errorDumpSerialize(self):
         return self.serializeLLQ()
@@ -469,14 +469,14 @@ class Scope(Value):
         return self.__scopedValues__[name]
 
     def addScopedMacroValue(self, callingFrame: StackFrame, name, value) -> Scope:
-        checkReservedKeyword(callingFrame, name)
+        SupportFunctions.checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
         copy.__scopedNames__[name] = VarType.Macro
         copy.__scopedValues__[name] = value
         return copy
 
     def addScopedRegularValue(self, callingFrame: StackFrame, name, value) -> Scope:
-        checkReservedKeyword(callingFrame, name)
+        SupportFunctions.checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
         copy.__scopedNames__[name] = VarType.Regular
         copy.__scopedValues__[name] = value
@@ -504,7 +504,7 @@ class HandlerFrame(Value):
         self.branchPointFrame = branchPointFrame
 
     def addHandler(self, callingFrame: StackFrame, name, value) -> HandlerFrame:
-        checkReservedKeyword(callingFrame, name)
+        SupportFunctions.checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
         copy.__handlerSet__[name] = value
         return copy
@@ -592,7 +592,7 @@ class StackFrame:
 
     def withExecutionState(self, executionState: Value) -> StackFrame:
         copy = self.__copy__()
-        copy.executionState[0] = executionState
+        copy.executionState = executionState
         return copy
 
     #Subevaluation logic
@@ -605,9 +605,9 @@ class StackFrame:
         """
         if self.executionState.kind != Kind.sExpression:
             self.throwError("Tried to evaluate a subitem of a value that isnt an s expression. Engine error.")
-        if itemIndex >= len(self.executionState):
+        if itemIndex >= len(self.executionState.value):
             self.throwError("Tried to evaluate a subitem that is out of range. Engine error.")
-        return self.executionState[itemIndex].kind not in [Kind.sExpression, Kind.StackReturnValue, Kind.Reference]
+        return self.executionState.value[itemIndex].kind not in [Kind.sExpression, Kind.StackReturnValue, Kind.Reference]
 
     def SubEvaluate(self, itemIndex) -> StackFrame:
         """
@@ -618,19 +618,19 @@ class StackFrame:
         """
         if self.isFullyEvaluated(itemIndex):
             self.throwError("Item is already fully evaluated. Engine error.")
-        item = self.executionState[itemIndex]
+        item = self.executionState.value[itemIndex]
         if item.kind == Kind.sExpression:
-            oldFrame = self.withExecutionState(sExpression([
-                self.executionState[:itemIndex] + [StackReturnValue()] + self.executionState[itemIndex + 1:]
-            ]))
+            oldFrame = self.withExecutionState(sExpression(
+                self.executionState.value[:itemIndex] + [StackReturnValue()] + self.executionState.value[itemIndex + 1:]
+            ))
             newStack = oldFrame.createChild(item)
             return newStack
 
         # its indirection
-        trueValue = dereference(self.withExecutionState(item))
-        return self.withExecutionState(sExpression([
-            self.executionState[:itemIndex] + [trueValue] + self.executionState[itemIndex + 1:]
-        ]))
+        trueValue = SupportFunctions.dereference(self.withExecutionState(item))
+        return self.withExecutionState(sExpression(
+            self.executionState.value[:itemIndex] + [trueValue] + self.executionState.value[itemIndex + 1:]
+        ))
 
     #Scope logic
 
