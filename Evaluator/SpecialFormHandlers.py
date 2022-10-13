@@ -1,6 +1,6 @@
 from Config.langConfig import SpecialForms
 from Evaluator.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandlerFrame, \
-    HandleInProgress
+    HandleReturnValue, HandleBranchPoint
 from Evaluator.HandlerStateRegistry import HandlerStateSingleton
 from Evaluator.SupportFunctions import dereference, MustBeKind, SpecialFormSlicer, QuoteCode
 
@@ -85,6 +85,14 @@ def verifyHandlerQuotekeyValuePairs(callingFrame: StackFrame, keyValue):
 
 
 def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
+    """
+
+    :param currentFrame:
+    :return: A new stack in the form of, from top to bottom:
+    <Original frame with handle invocation replaced with a stack return value> <-
+    <A frame containing only a handle branch point, which keeps track of a possible branch> <=
+    <A frame containing to code to evaluate, and the new handler stack frame>
+    """
     [[handlerWord, codeToEvaluate, handlerQuotekeyValuePairs, stateSeed], tail] = SpecialFormSlicer(currentFrame, SpecialForms.handle)
 
     if not currentFrame.isFullyEvaluated(2):#handlerQuotekeyValuePairs
@@ -98,19 +106,22 @@ def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
     handlerID = HandlerStateSingleton.registerHandlerFrame(stateSeed)
 
     #Create the special stack return value inprogressvalue
-    inProgressValue = HandleInProgress(handlerID)
+    inProgressValue = HandleReturnValue(handlerID)
     #current frame with handle invocation replaced with the stack return value
     newParentFrame = currentFrame\
         .withExecutionState(sExpression([inProgressValue] + tail))
 
-    newHandler = HandlerFrame(handlerID, newParentFrame)
+    #Should NOT contain the handlers, and only the branch point. Handles a possible branch moment.
+    branchFrame = newParentFrame.createChild(HandleBranchPoint())
+
+    newHandler = HandlerFrame(handlerID, branchFrame)
     newHandler.parent = currentFrame.closestHandlerFrame
 
     for i in handlerQuotekeyValuePairs.value:
         newHandler = newHandler.addHandler(currentFrame, i.value[0].value, i.value[1])
 
-    #Subevaluation stack with new handler added
-    evaluationFrame = newParentFrame\
+    #Subevaluation stack with new handler added.
+    evaluationFrame = branchFrame\
         .createChild(codeToEvaluate)\
         .withHandlerFrame(newHandler)
 

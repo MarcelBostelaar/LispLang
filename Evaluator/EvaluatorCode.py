@@ -1,5 +1,5 @@
 from Evaluator.Classes import sExpression, Kind, StackFrame, Value, \
-    StackReturnValue, Lambda, List
+    StackReturnValue, Lambda
 from Evaluator.SpecialFormHandlers import ExecuteSpecialForm
 from Evaluator.SupportFunctions import dereference, isSpecialFormKeyword
 
@@ -28,24 +28,6 @@ def EvalLambda(currentFrame: StackFrame) -> StackFrame:
         )
 
 
-def EvalUnfinishedHandlerInvocation(currentFrame):
-    if not currentFrame.isFullyEvaluated(1):
-        return currentFrame.SubEvaluate(1)
-    head = currentFrame.executionState.value[0]
-    tail = currentFrame.executionState.value[1:]
-    tailHead = tail[0]
-    trueTail = tail[1:]
-
-    applied = head.bind(tailHead, currentFrame)
-
-    if not applied.canRun(currentFrame):
-        return currentFrame.withExecutionState(
-            sExpression([applied] + trueTail)
-        )
-
-    #get
-
-
 def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
     head = currentFrame.executionState.value[0]
     tail = currentFrame.executionState.value[1:]
@@ -65,6 +47,11 @@ def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
 def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
     if currentFrame.executionState.kind in [Kind.Reference, Kind.HandleInProgress, Kind.StackReturnValue]:
         resultValue = dereference(currentFrame)
+    if currentFrame.executionState.kind == Kind.HandleBranchPoint:
+        raise NotImplementedError("")
+        #TODO if its continue path is none, treat as a stack return value, just pass along child value
+        #TODO if it has a continue branch, check if its continue or stop, if continue, append contained value in new stack to continue,
+        # else if its stop, return unit
     else:
         resultValue = currentFrame.executionState
 
@@ -110,10 +97,6 @@ def Eval(currentFrame: StackFrame) -> Value:
 
         if head.kind == Kind.Lambda:
             currentFrame = EvalLambda(currentFrame)
-            continue
-
-        if head.kind == Kind.UnfinishedHandlerInvocation:
-            currentFrame = EvalUnfinishedHandlerInvocation(currentFrame)
             continue
 
         # All other options are wrong

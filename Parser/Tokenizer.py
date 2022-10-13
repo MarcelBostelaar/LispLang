@@ -8,7 +8,7 @@ def removeItem(list_of_stuff, item):
 
 
 def tokenizeSingle(text, on):
-    splitted = (text).split(on)
+    splitted = text.split(on)
     splitted = splitted
     splitted = [[on, x] for x in splitted]
     splitted = flatten(splitted)
