@@ -30,7 +30,6 @@ def runtimeTestInternal(inputfile, expectedfile, testName):
     exp = f.read()
     f.close()
     parsedinp = tokenizeParse(inp).content
-    parsedexp = tokenizeParse(exp).content
 
 
     ranCode = Eval(outerDefaultRuntimeFrame.createChild(toAST(parsedinp)))

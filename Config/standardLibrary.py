@@ -1,6 +1,7 @@
 from Config.langConfig import continueKeyword, stopKeyword
 from Evaluator.SupportFunctions import MustBeKind
-from Evaluator.Classes import List, Kind, SystemFunction, Boolean, StackFrame, StackReturnValue, Number, ContinueStop
+from Evaluator.Classes import List, Kind, SystemFunction, Boolean, StackFrame, StackReturnValue, Number, ContinueStop, \
+    UnfinishedHandlerInvocation
 
 
 def head(somelist: List, callingFrame: StackFrame):
@@ -37,6 +38,16 @@ def continueStop(isContinue):
     return internal
 
 
+def handlerInvocationDefinition(name, length, callingFrame: StackFrame):
+    MustBeKind(callingFrame, name, "Handler invocation definition must give as the first argument, the handled name as a quoted name", Kind.QuotedName)
+    MustBeKind(callingFrame, length, "Handler invocation definition must give as second argument, its length with a number", Kind.Number)
+    if length < 1:
+        callingFrame.throwError("Length of handler invocation definition must be 1 or higher")
+    if not length.is_integer():
+        callingFrame.throwError("Length of handler invocation definition must be a whole number")
+    return UnfinishedHandlerInvocation(name.value, length.value)
+
+
 
 standardLibrary = {
     "head": SystemFunction(head, 1),
@@ -45,7 +56,8 @@ standardLibrary = {
     "equals": SystemFunction(equals, 2),
     "sum": SystemFunction(sum, 2),
     continueKeyword: SystemFunction(continueStop(True), 1),
-    stopKeyword: SystemFunction(continueStop(False), 1)
+    stopKeyword: SystemFunction(continueStop(False), 1),
+    "declareEffectfulFunction": SystemFunction(handlerInvocationDefinition, 2)
 }
 
 

@@ -50,7 +50,8 @@ def stringBase(min, max):
 
 stringCombinator = stringBase(0, None)\
     .mapResult(lambda x: [Char(y) for y in list(x)])\
-    .mapResult(List)
+    .mapResult(List)\
+    .mapResult(lambda x: [x])
 
 char = MC("c").ignore().then(stringBase(1, 1)).mapResult(Char)
 
