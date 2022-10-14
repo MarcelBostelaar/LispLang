@@ -4,6 +4,7 @@ import functools
 from enum import Enum
 from termcolor import cprint
 import Config.langConfig
+from Config import langConfig
 from Evaluator import SupportFunctions
 from Evaluator.HandlerStateRegistry import HandlerStateSingleton
 
@@ -23,6 +24,7 @@ class Kind(Enum):
     HandleInProgress = 12
     HandlerFrame = 13
     HandleBranchPoint = 14
+    Unit = 15
 
 
 class Value:
@@ -133,13 +135,15 @@ class Char(Value):
 
 
 class ContinueStop(Value):
-    def __init__(self, isContinue: bool, value: Value):
-        super().__init__(value, Kind.ContinueStop)
+    def __init__(self, isContinue: bool, returnValue: Value, newState: Value):
+        super().__init__(None, Kind.ContinueStop)
         self.isContinue = isContinue
+        self.returnValue = returnValue
+        self.newState = newState
 
     def __unRun__(self) -> Value:
         keyword = Config.langConfig.continueKeyword if self.isContinue else Config.langConfig.stopKeyword
-        return List([Reference(keyword), self.value])
+        return List([Reference(keyword), self.returnValue, self.newState])
 
     def isSerializable(self):
         return self.value.isSerializable()
@@ -208,6 +212,23 @@ class Number(Value):
         if other.kind != self.kind:
             return False
         return self.value == other.value
+
+
+class Unit(Value):
+    def __init__(self):
+        super().__init__(None, Kind.Unit)
+
+    def serializeLLQ(self):
+        return langConfig.unitKeyword
+
+    def errorDumpSerialize(self):
+        return self.serializeLLQ()
+
+    def isSerializable(self):
+        return True
+
+    def equals(self, other):
+        return other.kind == self.kind
 
 
 ## Interpreter types
@@ -306,10 +327,11 @@ class UserLambda(Lambda):
 class SystemFunction(Lambda):
     """In memory representation of a system function"""
 
-    def __init__(self, function, bindingsLeft):
+    def __init__(self, name, function, bindingsLeft):
         super().__init__()
         self.function = function
         self.bindingsLeft = bindingsLeft
+        self.name = name
 
     def equals(self, other):
         super(SystemFunction, self).equals(other)
@@ -325,10 +347,10 @@ class SystemFunction(Lambda):
     def bind(self, argument, callingFrame):
         if self.bindingsLeft <= 0:
             callingFrame.throwError("Tried to bind to a fully bound system function")
-        return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
+        return SystemFunction(self.name, functools.partial(self.function, argument), self.bindingsLeft - 1)
 
     def errorDumpSerialize(self):
-        return "SystemFunction"
+        return f"SystemFunction<{self.name}>"
 
 
 class UnfinishedHandlerInvocation(Lambda):
@@ -378,7 +400,7 @@ class UnfinishedHandlerInvocation(Lambda):
         branchPointFrame = handlerFrame.branchPointFrame
 
         #The created continue value should be added like a lambda return below the calling frame, if its continued.
-        newBranchpointFrame = branchPointFrame.withExecutionState(HandleBranchPoint(continueBranch=callingFrame))
+        newBranchpointFrame = branchPointFrame.withExecutionState(HandleBranchPoint(handlerFrame.handlerID, continueBranch=callingFrame))
 
         #The handle branch point frame is used as the parent of the new branch, to make sure the returned value
         # returns to the branch value. Branch value frame doesn't have the handler set being used here.
@@ -387,7 +409,7 @@ class UnfinishedHandlerInvocation(Lambda):
         return handleFuncRunningFrame
 
     def errorDumpSerialize(self):
-        pass
+        return f"UnfinishedHandlerInvocation<{self.name}, with: {', '.join([x.errorDumpSerialize() for x in self.args])}>"
 
     def equals(self, other):
         raise NotImplementedError("")
@@ -402,19 +424,29 @@ class HandleReturnValue(Value):
         self.handlerID = handlerID
 
     def errorDumpSerialize(self):
-        raise NotImplementedError("")
+        return f"HandleReturnValue<{self.handlerID}>"
 
     def equals(self, other):
         raise NotImplementedError("")
 
 
 class HandleBranchPoint(Value):
-    def __init__(self, continueBranch=None):
+    def __init__(self, handlerID: int, continueBranch=None):
         super().__init__(None, Kind.HandleBranchPoint)
         self.continueBranch = continueBranch
+        self.handlerID = handlerID
 
     def errorDumpSerialize(self):
-        raise NotImplementedError("")
+        if self.continueBranch is not None:
+            return f"\n" \
+                   f"HandleBranchPoint with continue branch. Continue branch:" +\
+                   self.continueBranch.errorDumpSerialize() +\
+                   f"\n"
+        else:
+            return f"\n" \
+                   f"HandleBranchPoint without continue branch." \
+                   f"\n"
+
 
     def equals(self, other):
         raise NotImplementedError("")
@@ -685,11 +717,11 @@ class StackFrame:
     def getHandler(self, name):
         if not self.hasHandler(name):
             self.throwError("Tried to retrieve a handler that doesnt exist. Engine error.")
-        return self.closestHandlerFrame.getHandler()
+        return self.closestHandlerFrame.getHandler(self, name)
 
     def getHandlerFrame(self, name) -> HandlerFrame:
         if self.closestHandlerFrame is not None:
-            return self.closestHandlerFrame.getHandlerFrame(name)
+            return self.closestHandlerFrame.getHandlerFrame(self, name)
         self.throwError("No handler exists")
 
     #Utility logic
@@ -703,6 +735,8 @@ class StackFrame:
     def __stackTrace__(self):
         if self.parent is not None:
             self.parent.__stackTrace__()
+        if isinstance(self.executionState, list):
+            i=10
         cprint("\tat: " + self.executionState.errorDumpSerialize(), color="red")
 
     def throwError(self, errorMessage):

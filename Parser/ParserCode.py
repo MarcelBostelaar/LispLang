@@ -1,8 +1,9 @@
 import string
 
+import Config.langConfig
 from Config import errorMessages
 from Config.langConfig import separateSymbols
-from Evaluator.Classes import QuotedName, List, Char, Boolean, Number
+from Evaluator.Classes import QuotedName, List, Char, Boolean, Number, Unit
 from Parser.ParserCombinator import MS, Any, SOF, EOF, reduceOR, AnyOfMS, ConcatStrings, MC
 
 linebreaks = MS("\n").OR(MS("\r"))
@@ -51,21 +52,19 @@ def stringBase(min, max):
     correctString = partialStringBase(min, max).then(MS("\"").ignore())
     unclosedString = partialStringBase(min, max).then(EOF.errorIfSucceeds(errorMessages.unclosedString))
 
-    return correctString.OR(unclosedString)\
-        .mapResult(ConcatStrings)
+    return correctString.OR(unclosedString)
 
 
 stringCombinator = stringBase(0, None)\
     .mapResult(lambda x: [Char(y) for y in list(x)])\
-    .mapResult(List)\
-    .mapResult(lambda x: [x])
+    .mapResult(lambda x: [List([QuotedName("list"), List(x)])])
 
 char = MC("c").ignore().then(stringBase(1, 1)).mapResult(Char)
 
 stringChars = stringCombinator.OR(char)
 
 bools = MS("true").OR(MS("false")).mapSingle(Boolean)
-
+unit = MS(Config.langConfig.unitKeyword).mapResult(lambda x: [Unit()])
 num0to9 = AnyOfMS(*list("1234567890"))
 num1to9 = AnyOfMS(*list("123456789"))
 positiveIntegers = num1to9.then(num0to9.many(0))
@@ -80,7 +79,7 @@ allDecimals = positiveDecimals.OR(negativeDecimals).mapResult(ConcatStrings)
 
 allNumbers = allDecimals.OR(allIntegers).mapSingle(float).mapSingle(Number).wrap(ignore)
 
-inlineValues = stringChars.OR(bools).OR(allNumbers)
+inlineValues = stringChars.OR(bools).OR(allNumbers).OR(unit)
 
 separateItems = AnyOfMS(*list(separateSymbols)).mapSingle(QuotedName)
 atozAndUnder = AnyOfMS(*list(string.ascii_lowercase + string.ascii_uppercase + "_"))

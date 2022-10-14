@@ -1,1 +1,1 @@
-list [1 "some string\nother string!"]
+list [1 "some string\nother string!\n"]

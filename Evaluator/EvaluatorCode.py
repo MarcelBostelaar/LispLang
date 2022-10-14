@@ -1,5 +1,6 @@
 from Evaluator.Classes import sExpression, Kind, StackFrame, Value, \
-    StackReturnValue, Lambda
+    StackReturnValue, Lambda, HandleBranchPoint, ContinueStop, Unit
+from Evaluator.HandlerStateRegistry import HandlerStateSingleton
 from Evaluator.SpecialFormHandlers import ExecuteSpecialForm
 from Evaluator.SupportFunctions import dereference, isSpecialFormKeyword
 
@@ -44,14 +45,44 @@ def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
     currentFrame.throwError("Could not find reference " + head.value + ".")
 
 
+def EvalHandleTopLevelValueHandleBranchPoint(currentFrame: StackFrame) -> (bool, any):
+    """
+    Evaluates a top level HandleBranchPoint.
+    :param currentFrame:
+    :return: Bool indicating whether the returned value is a new raw value, raw value if true/new frame if false
+    """
+    point: HandleBranchPoint = currentFrame.executionState
+    if point.continueBranch is not None:
+        returnedValue: ContinueStop = currentFrame.getChildReturnValue()
+        if returnedValue.kind != Kind.ContinueStop:
+            currentFrame.throwError("Returned a value that isn't a continue or stop!")
+        #set the state to the new value
+        HandlerStateSingleton.setState(point.handlerID, returnedValue.newState)
+        if returnedValue.isContinue:
+            #continue with the continuation value
+            return False, point.continueBranch.createChild(returnedValue.returnValue)
+        else:
+            #stopped, return the given return value
+            resultValue = returnedValue.returnValue
+    else:
+        #Return of the regular branch
+        resultValue = currentFrame.getChildReturnValue()
+
+    if currentFrame.parent is None:
+        return True, resultValue
+    return False, currentFrame.parent.withChildReturnValue(resultValue)
+
+
 def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
-    if currentFrame.executionState.kind in [Kind.Reference, Kind.HandleInProgress, Kind.StackReturnValue]:
+    """
+    Evaluates a top level single value.
+    :param currentFrame:
+    :return: Bool indicating whether the returned value is a new raw value, raw value if true/new frame if false
+    """
+    if currentFrame.executionState.kind == Kind.HandleBranchPoint:
+        return EvalHandleTopLevelValueHandleBranchPoint(currentFrame)
+    elif currentFrame.executionState.kind in [Kind.Reference, Kind.HandleInProgress, Kind.StackReturnValue]:
         resultValue = dereference(currentFrame)
-    elif currentFrame.executionState.kind == Kind.HandleBranchPoint:
-        raise NotImplementedError("")
-        #TODO if its continue path is none, treat as a stack return value, just pass along child value
-        #TODO if it has a continue branch, check if its continue or stop, if continue, append contained value in new stack to continue,
-        # else if its stop, return unit
     else:
         resultValue = currentFrame.executionState
 

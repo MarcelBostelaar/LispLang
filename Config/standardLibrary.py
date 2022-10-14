@@ -33,8 +33,8 @@ def sum(A, B, callingFrame: StackFrame):
 
 
 def continueStop(isContinue):
-    def internal(value, callingFrame: StackFrame):
-        return ContinueStop(isContinue, value)
+    def internal(returnValue, newState, callingFrame: StackFrame):
+        return ContinueStop(isContinue, returnValue, newState)
     return internal
 
 
@@ -50,14 +50,14 @@ def handlerInvocationDefinition(name, length, callingFrame: StackFrame):
 
 
 standardLibrary = {
-    "head": SystemFunction(head, 1),
-    "tail": SystemFunction(tail, 1),
-    "concat": SystemFunction(concat, 2),
-    "equals": SystemFunction(equals, 2),
-    "sum": SystemFunction(sum, 2),
-    continueKeyword: SystemFunction(continueStop(True), 1),
-    stopKeyword: SystemFunction(continueStop(False), 1),
-    "declareEffectfulFunction": SystemFunction(handlerInvocationDefinition, 2)
+    "head": SystemFunction("head", head, 1),
+    "tail": SystemFunction("tail", tail, 1),
+    "concat": SystemFunction("concat", concat, 2),
+    "equals": SystemFunction("equals", equals, 2),
+    "sum": SystemFunction("sum", sum, 2),
+    continueKeyword: SystemFunction(continueKeyword, continueStop(True), 2),
+    stopKeyword: SystemFunction(stopKeyword, continueStop(False), 2),
+    "declareEffectfulFunction": SystemFunction("declareEffectfulFunction", handlerInvocationDefinition, 2)
 }
 
 

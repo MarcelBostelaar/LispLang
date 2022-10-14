@@ -37,7 +37,9 @@ def handleSpecialFormLet(currentFrame: StackFrame):
     MustBeKind(currentFrame, name, "The first arg after a let must be a name", Kind.Reference)
     if not currentFrame.isFullyEvaluated(2):
         return currentFrame.SubEvaluate(2)
-    return currentFrame.addScopedRegularValue(name.value, value).withExecutionState(tail)
+    return currentFrame\
+        .addScopedRegularValue(name.value, value)\
+        .withExecutionState(sExpression(tail))
 
 
 def handleSpecialFormList(currentFrame):
@@ -81,7 +83,7 @@ def verifyHandlerQuotekeyValuePairs(callingFrame: StackFrame, keyValue):
         if len(i.value) != 2:
             callingFrame.throwError(errMessage)
         MustBeKind(callingFrame, i.value[0], errMessage, Kind.QuotedName)
-        MustBeKind(callingFrame, i.value[0], errMessage, Kind.Lambda)
+        MustBeKind(callingFrame, i.value[1], errMessage, Kind.Lambda)
 
 
 def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
@@ -112,7 +114,7 @@ def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
         .withExecutionState(sExpression([inProgressValue] + tail))
 
     #Should NOT contain the handlers, and only the branch point. Handles a possible branch moment.
-    branchFrame = newParentFrame.createChild(HandleBranchPoint())
+    branchFrame = newParentFrame.createChild(HandleBranchPoint(handlerID))
 
     newHandler = HandlerFrame(handlerID, branchFrame)
     newHandler.parent = currentFrame.closestHandlerFrame
@@ -126,6 +128,13 @@ def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
         .withHandlerFrame(newHandler)
 
     return evaluationFrame
+
+
+def handleSpecialFormIgnore(currentFrame: StackFrame) -> StackFrame:
+    [[ignoreWord, codeToPerform], tail] = SpecialFormSlicer(currentFrame, SpecialForms.ignore)
+    if currentFrame.isFullyEvaluated(1):
+        return currentFrame.withExecutionState(sExpression(tail))
+    return currentFrame.SubEvaluate(1)
 
 
 def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
@@ -155,5 +164,8 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
 
     if name == SpecialForms.handle.value.keyword:
         return handleSpecialFormHandle(currentFrame)
+
+    if name == SpecialForms.ignore.value.keyword:
+        return handleSpecialFormIgnore(currentFrame)
 
     currentFrame.throwError("Unknown special form (engine bug)")

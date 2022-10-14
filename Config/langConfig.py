@@ -14,8 +14,9 @@ def c(keyword, length):
 currentScopeKeyword = "currentScope"
 continueKeyword = "continue"
 stopKeyword = "stop"
+unitKeyword = "unit"
 
-reservedWords = [currentScopeKeyword, "true", "false"]
+reservedWords = [currentScopeKeyword, "true", "false", unitKeyword]
 
 # all the symbols parsed individually as atom names for enable more specialized syntax
 
@@ -31,6 +32,6 @@ class SpecialForms(Enum):
     list = c("list", 2) #list (a b c)
     Lambda = c("lambda", 3) #lambda args body
     cond = c("cond", 4) #cond bool truepath falsepath
-    ignore = c("ignore", 1) #ignore (somevalue or function)
-    handle = c("handle", 3) #handle effectfullCode '[[handlername @handler1] [handlername2 @handler2] etc]] stateSeed
+    ignore = c("ignore", 2) #ignore (somevalue or function)
+    handle = c("handle", 4) #handle effectfullCode '[[handlername @handler1] [handlername2 @handler2] etc]] stateSeed
 

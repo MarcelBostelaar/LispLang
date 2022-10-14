@@ -10,7 +10,7 @@ let somefunction [lambda [x] [
 let printHandler [lambda [state toPrint] [
     let state [concat state toPrint]
     let state [concat state "\n"]
-    continue state
+    continue unit state
     ]
 ]
 
