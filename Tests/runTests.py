@@ -6,24 +6,24 @@ from Tests.CompileTests.TestRunner import compileTest
 from Tests.ParseTests.TestRunner import parseTest, parseErrorTest
 
 from Tests.ParseTests import test1Expected
-from Tests.RuntimeTests.TestRunner import runtimeTest
+from Tests.uncompiledRuntimeTest.TestRunner import uncompiledRuntimeTest
 
 catchErrors = False
 
 compileTest = partial(compileTest, catchErrors)
-runtimeTest = partial(runtimeTest, catchErrors)
+uncompiledRuntimeTest = partial(uncompiledRuntimeTest, catchErrors)
 
 ########################################################
 
-# parseTest("ParseTests/test1.lisp", test1Expected.expected, "Parse Tests 1")
-# parseErrorTest("ParseTests/unclosedStringTest.lisp", ParseError(1, errorMessages.unclosedString), "Unclosed string test")
-# parseErrorTest("ParseTests/unmatchedBracketTest.lisp", ParseError(1, errorMessages.unclosedBracket), "Unmatched Bracket Test", "ParseTests/unmatchedBracketTestCorrect.lisp")
-#
-# runtimeTest("RuntimeTests/sumtest1real.lisp", "RuntimeTests/sumtest1expected.lisp", "Sum test 1")
-# runtimeTest("RuntimeTests/sumtest2real.lisp", "RuntimeTests/sumtest2expected.lisp", "Sum test 2")
-# runtimeTest("RuntimeTests/listEvaluationReal.lisp", "RuntimeTests/listEvaluationExpected.lisp", "List evaluation test")
-runtimeTest("RuntimeTests/handleTest1Real.lisp", "RuntimeTests/handleTest1Expected.lisp", "Handle test")
+parseTest("ParseTests/test1.lisp", test1Expected.expected, "Parse Tests 1")
+parseErrorTest("ParseTests/unclosedStringTest.lisp", ParseError(1, errorMessages.unclosedString), "Unclosed string test")
+parseErrorTest("ParseTests/unmatchedBracketTest.lisp", ParseError(1, errorMessages.unclosedBracket), "Unmatched Bracket Test", "ParseTests/unmatchedBracketTestCorrect.lisp")
 
-# compileTest("CompileTests/macro identity.lisp", "CompileTests/macro identity.lisp", "Macro identity")
-# compileTest("CompileTests/simple macro real.lisp", "CompileTests/simple macro expected.lisp", "Simplest demacro Tests")
-# compileTest("CompileTests/macroTailReal.lisp", "CompileTests/macroTailExpected.lisp", "Macro tail Tests")
+uncompiledRuntimeTest("uncompiledRuntimeTest/sumtest1real.lisp", "uncompiledRuntimeTest/sumtest1expected.lisp", "Sum test 1")
+uncompiledRuntimeTest("uncompiledRuntimeTest/sumtest2real.lisp", "uncompiledRuntimeTest/sumtest2expected.lisp", "Sum test 2")
+uncompiledRuntimeTest("uncompiledRuntimeTest/listEvaluationReal.lisp", "uncompiledRuntimeTest/listEvaluationExpected.lisp", "List evaluation test")
+uncompiledRuntimeTest("uncompiledRuntimeTest/handleTest1Real.lisp", "uncompiledRuntimeTest/handleTest1Expected.lisp", "Handle test")
+
+compileTest("CompileTests/macro identity.lisp", "CompileTests/macro identity.lisp", "Macro identity")
+compileTest("CompileTests/simple macro real.lisp", "CompileTests/simple macro expected.lisp", "Simplest demacro Tests")
+compileTest("CompileTests/macroTailReal.lisp", "CompileTests/macroTailExpected.lisp", "Macro tail Tests")

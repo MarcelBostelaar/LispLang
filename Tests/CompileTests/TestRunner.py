@@ -28,14 +28,24 @@ def compileTestInternal(inputfile, expectedfile, testName):
     f = open(expectedfile)
     exp = f.read()
     f.close()
-    parsedinp = tokenizeParse(inp).content
-    parsedexp = tokenizeParse(exp).content
+    parsedinp = tokenizeParse(inp)
+    parsedexp = tokenizeParse(exp)
 
+    if len(parsedinp.errors) != 0:
+        cprint(testName + " failed, parsing error in input", "red")
+        for i in parsedinp.errors:
+            cprint(f"{i.message} at {i.lengthRemaining}", "red")
+        return
+    if len(parsedexp.errors) != 0:
+        cprint(testName + " failed, parsing error in expected output", "red")
+        for i in parsedexp.errors:
+            cprint(f"{i.message} at {i.lengthRemaining}", "red")
+        return
 
-    demacroedCode = DemacroTop(outerDefaultRuntimeFrame.createChild(parsedinp))
+    demacroedCode = DemacroTop(outerDefaultRuntimeFrame.createChild(parsedinp.content))
 
     realSer = demacroedCode.serializeLLQ()
-    expSer = parsedexp.serializeLLQ()
+    expSer = parsedexp.content.serializeLLQ()
 
     if realSer == expSer:
         cprint(testName + " passed", "green")

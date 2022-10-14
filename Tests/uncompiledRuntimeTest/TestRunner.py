@@ -7,7 +7,7 @@ from Evaluator.SupportFunctions import toAST
 from main import tokenizeParse
 
 
-def runtimeTest(catchErrors, inputfile, expectedfile, testName):
+def uncompiledRuntimeTest(catchErrors, inputfile, expectedfile, testName):
     if catchErrors:
         try:
             runtimeTestInternal(inputfile, expectedfile, testName)
