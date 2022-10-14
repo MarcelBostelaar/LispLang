@@ -1,5 +1,6 @@
 import string
 
+from Config import errorMessages
 from Config.langConfig import separateSymbols
 from Evaluator.Classes import QuotedName, List, Char, Boolean, Number
 from Parser.ParserCombinator import MS, Any, SOF, EOF, reduceOR, AnyOfMS, ConcatStrings, MC
@@ -35,16 +36,22 @@ def escapedChars(*pairs):
 allEscapedChars = escapedChars(["n", "\n"], ["t", "\t"], ["r", "\r"], ['"', '"'], ["'", "'"])
 
 
+def partialStringBase(min, max):
+    return MS("\"").ignore() \
+        .then(
+        allEscapedChars
+        .OR(
+            MS("\"").OR(EOF).mustFailThenTry(Any)
+        ).many(min, max)
+    )
+
+
 def stringBase(min, max):
     """A standard string base matcher with a minimum and maximum length (inclusive)"""
-    return MS("\"").ignore()\
-        .then(
-            allEscapedChars
-            .OR(
-                MS("\"").mustFailThenTry(Any)
-            ).many(min, max)
-        )\
-        .then(MS("\"").ignore())\
+    correctString = partialStringBase(min, max).then(MS("\"").ignore())
+    unclosedString = partialStringBase(min, max).then(EOF.errorIfSucceeds(errorMessages.unclosedString))
+
+    return correctString.OR(unclosedString)\
         .mapResult(ConcatStrings)
 
 
@@ -96,7 +103,9 @@ def BracketedContent():
     """Parses a series of atoms/lists inside brackets into a new list"""
     return pureMS("[") \
         .thenLazy(ProgramContent)\
-        .then(pureMS("]")) \
+        .then(
+            pureMS("]").failRecovery(errorMessages.unclosedBracket, ["]"])
+        ) \
         .mapResult(lambda x: x[1:-1]) \
         .mapResult(List) \
         .mapResult(lambda x: [x])

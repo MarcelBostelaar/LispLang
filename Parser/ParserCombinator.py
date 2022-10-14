@@ -1,13 +1,22 @@
+from __future__ import annotations
+
 class parseResult:
-    def __init__(self, isSucces, content, remaining):
+    def __init__(self, isSucces, content, remaining, errors):
         self.isSucces = isSucces
         self.content = content # a list of tokens
         self.remaining = remaining
+        self.errors = errors
 
     def map(self, f):
         if self.isSucces:
-            return parseResult(True, f(self.content), self.remaining)
+            return parseResult(True, f(self.content), self.remaining, self.errors)
         return self
+
+
+class ParseError:
+    def __init__(self, lengthRemaining: int, errorMessage):
+        self.lengthRemaining = lengthRemaining
+        self.message = errorMessage
 
 
 class Combinator:
@@ -25,9 +34,12 @@ class Combinator:
                 result = self.f(tokens)
                 print(self.debugMessage)
                 if result.isSucces:
-                    print("success, parsed:")
+                    print("Success, parsed:")
                     print(result.content)
-                    print("remainder:")
+                    if len(result.errors) > 0:
+                        print("Errors:")
+                        print("\n".join([x.message for x in result.errors]))
+                    print("Remainder:")
                     print(result.remaining)
                     print("")
                 else:
@@ -40,10 +52,10 @@ class Combinator:
                 print(self.debugMessage)
                 raise e
 
-    def addDebugMessage(self, message):
+    def addDebugMessage(self, message) -> Combinator:
         return Combinator(self.f, message)
 
-    def thenLazy(self, otherCombinator):
+    def thenLazy(self, otherCombinator) -> Combinator:
         def internal(tokens):
             result1 = self.parse(tokens)
             if result1.isSucces:
@@ -52,15 +64,15 @@ class Combinator:
                 if result2.isSucces:
                     return parseResult(True,
                                        result1.content + result2.content,
-                                       result2.remaining)
+                                       result2.remaining, result1.errors + result2.errors)
                 return result2
             return result1
         return Combinator(internal)
 
-    def then(self, combinator):
+    def then(self, combinator) -> Combinator:
         return self.thenLazy(lambda: combinator)
 
-    def OR(self, otherCombinator):
+    def OR(self, otherCombinator) -> Combinator:
         def internal(tokens):
             result1 = self.parse(tokens)
             if result1.isSucces:
@@ -70,17 +82,17 @@ class Combinator:
             return result2
         return Combinator(internal)
 
-    def many(self, minimum, maximum=None):
+    def many(self, minimum, maximum=None) -> Combinator:
         """Makes the parser combinator match N or more of itself"""
         def internal(tokens):
-            accumulate = parseResult(True, [], tokens)
-            result = parseResult(True, [], tokens)
+            accumulate = parseResult(True, [], tokens, [])
+            result = parseResult(True, [], tokens, [])
             totalMatched = -1
             while result.isSucces:
                 totalMatched += 1
                 accumulate = parseResult(True,
                                          accumulate.content + result.content,
-                                         result.remaining)
+                                         result.remaining, accumulate.errors + result.errors)
                 result = self.parse(accumulate.remaining)
                 if maximum is not None:
                     if totalMatched >= maximum:
@@ -88,35 +100,72 @@ class Combinator:
             if totalMatched >= minimum:
                 return accumulate
             else:
-                return parseResult(False, accumulate.content, accumulate.remaining)
+                return parseResult(False, accumulate.content, accumulate.remaining, [])
         return Combinator(internal)
 
-    def ignore(self):
+    def ignore(self) -> Combinator:
         return self.mapResult(lambda _: [])
 
-    def wrap(self, otherCombinator):
+    def wrap(self, otherCombinator) -> Combinator:
         return otherCombinator.then(self).then(otherCombinator)
 
-    def mustFailThenTry(self, otherCombinator):
+    def mustFailThenTry(self, otherCombinator) -> Combinator:
         """Executes otherCombinator if this combinator fails to parse"""
         def internal(tokens):
             result = self.parse(tokens)
             if result.isSucces:
-                return parseResult(False, result.content, result.remaining)
+                return parseResult(False, result.content, result.remaining, [])
             return otherCombinator.parse(tokens)
         return Combinator(internal)
 
-    def mapResult(self, g):
+    def mapResult(self, g) -> Combinator:
         def internal(tokens):
             result = self.parse(tokens)
             return result.map(g)
         return Combinator(internal)
 
-    def mapSingle(self, g):
+    def mapSingle(self, g) -> Combinator:
         return self.mapResult(lambda x: x[0]).mapResult(g).mapResult(lambda x: [x])
 
+    def failRecovery(self, errorMessage: str, substitutionValue: list = None) -> Combinator:
+        """
+        Changes the combinator to recover from a parse failure, and always succeed.
+        :param errorMessage: The error message to show
+        :param substitutionValue: The value to return if the original failed.
+        :return: New combinator
+        """
+        if substitutionValue is None:
+            substitutionValue = []
 
-def reduceOR(combinators):
+        def internal(tokens):
+            result = self.f(tokens)
+            if result.isSucces:
+                return result
+            return parseResult(True, substitutionValue, tokens, [ParseError(len(tokens), errorMessage)])
+        return Combinator(internal)
+
+    def errorIfSucceeds(self, errorMessage: str, substitutionValue: list = None) -> Combinator:
+        """
+        Changes the combinator to Substitute a given value instaed, if the original succeeds.
+        This undoes consumption of the token stream.
+        If original fails, still fails.
+        Useful for EOF recovery, for example
+        :param errorMessage: The error message to show
+        :param substitutionValue: The substitution value to return instead if the original succeeded. Fails if original fails.
+        :return: New combinator
+        """
+        if substitutionValue is None:
+            substitutionValue = []
+
+        def internal(tokens):
+            if self.f(tokens).isSucces:
+                return parseResult(True, substitutionValue, tokens, [ParseError(len(tokens), errorMessage)])
+            else:
+                return parseResult(False, None, tokens, [])
+        return Combinator(internal)
+
+
+def reduceOR(combinators) -> Combinator:
     reduced = combinators[0]
     combinators = combinators[1:]
     while len(combinators) != 0:
@@ -125,7 +174,7 @@ def reduceOR(combinators):
     return reduced
 
 
-def reduceTHEN(combinators):
+def reduceTHEN(combinators) -> Combinator:
     reduced = combinators[0]
     combinators = combinators[1:]
     while len(combinators) != 0:
@@ -134,13 +183,13 @@ def reduceTHEN(combinators):
     return reduced
 
 
-def MC(char):
+def MC(char) -> Combinator:
     """Match char"""
     def internal(tokens):
         if len(tokens) > 0:
             if tokens[0] == char:
-                return parseResult(True, [tokens[0]], tokens[1:])
-        return parseResult(False, None, tokens)
+                return parseResult(True, [tokens[0]], tokens[1:], [])
+        return parseResult(False, None, tokens, [])
     comb = Combinator(internal)
     return comb
 
@@ -160,26 +209,26 @@ def listEquals(a, b):
     return True
 
 
-def MS(specificString):
+def MS(specificString) -> Combinator:
     def internal(tokens):
         length = len(specificString)
         if len(tokens) >= length:
             if listEquals(tokens[:length], specificString):
-                return parseResult(True, ["".join(tokens[:length])], tokens[length:])
-        return parseResult(False, None, tokens)
+                return parseResult(True, ["".join(tokens[:length])], tokens[length:], [])
+        return parseResult(False, None, tokens, [])
     comb = Combinator(internal)
     return comb
 
 
-def AnyOfMS(*specificStrings):
+def AnyOfMS(*specificStrings) -> Combinator:
     return reduceOR([MS(x) for x in specificStrings])
 
 
 def AnyFunc(tokens):
     if len(tokens) > 0:
-        return parseResult(True, [tokens[0]], tokens[1:])
+        return parseResult(True, [tokens[0]], tokens[1:], [])
     # EOF
-    return parseResult(False, None, tokens)
+    return parseResult(False, None, tokens, [])
 
 
 Any = Combinator(AnyFunc)

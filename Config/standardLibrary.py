@@ -41,9 +41,9 @@ def continueStop(isContinue):
 def handlerInvocationDefinition(name, length, callingFrame: StackFrame):
     MustBeKind(callingFrame, name, "Handler invocation definition must give as the first argument, the handled name as a quoted name", Kind.QuotedName)
     MustBeKind(callingFrame, length, "Handler invocation definition must give as second argument, its length with a number", Kind.Number)
-    if length < 1:
+    if length.value < 1:
         callingFrame.throwError("Length of handler invocation definition must be 1 or higher")
-    if not length.is_integer():
+    if not length.value.is_integer():
         callingFrame.throwError("Length of handler invocation definition must be a whole number")
     return UnfinishedHandlerInvocation(name.value, length.value)
 

@@ -11,6 +11,7 @@ let printHandler [lambda [state toPrint] [
     let state [concat state toPrint]
     let state [concat state "\n"]
     continue state
-] /*missing bracket, rewrite parser to allow error paths*/
+    ]
+]
 
 handle [somefunction "other string!"] [list [[list [[quote print] printHandler]]]] ""
