@@ -382,31 +382,7 @@ class UnfinishedHandlerInvocation(Lambda):
         if not callingFrame.hasHandler(self.name):
             callingFrame.throwError(f"Tried to handle effectfull function '{self.name}'"
                                     f", but no handler for it was found.")
-
-        handlerFrame = callingFrame.getHandlerFrame(self.name)
-        handlerFunc: Lambda = callingFrame.getHandler(self.name)
-        handlerFunc = handlerFunc.bind(
-            HandlerStateSingleton.retrieveState(handlerFrame.handlerID),
-            callingFrame
-        )
-        for arg in self.args:
-            if handlerFunc.canRun():
-                callingFrame.throwError(f"Too many arguments exist in the handler '{self.name}' invocation.")
-            handlerFunc = handlerFunc.bind(arg, callingFrame)
-
-        if not handlerFunc.canRun():
-            callingFrame.throwError(f"Too few arguments for handler '{self.name}' invocation")
-
-        branchPointFrame = handlerFrame.branchPointFrame
-
-        #The created continue value should be added like a lambda return below the calling frame, if its continued.
-        newBranchpointFrame = branchPointFrame.withExecutionState(HandleBranchPoint(handlerFrame.handlerID, continueBranch=callingFrame))
-
-        #The handle branch point frame is used as the parent of the new branch, to make sure the returned value
-        # returns to the branch value. Branch value frame doesn't have the handler set being used here.
-        handleFuncRunningFrame = handlerFunc.createEvaluationFrame(newBranchpointFrame)
-
-        return handleFuncRunningFrame
+        return callingFrame.invokeHandler(self.name, self.args)
 
     def errorDumpSerialize(self):
         return f"UnfinishedHandlerInvocation<{self.name}, with: {', '.join([x.errorDumpSerialize() for x in self.args])}>"
@@ -528,8 +504,61 @@ class Scope(Value):
 
 
 class HandlerFrame(Value):
-    def __init__(self, handlerID, branchPointFrame: StackFrame):
+    def __init__(self):
         super().__init__(None, Kind.HandlerFrame)
+
+    def hasHandler(self, name):
+        raise NotImplementedError("Abstract class")
+
+    def invokeHandler(self, callingFrame: StackFrame, name: str, values: list) -> StackFrame:
+        raise NotImplementedError("Abstract class")
+
+    def errorDumpSerialize(self):
+        raise NotImplementedError("Abstract class")
+
+    def equals(self, other):
+        raise NotImplementedError()
+
+    def __copy__(self):
+        raise NotImplementedError("Abstract class")
+
+
+class SystemHandlerFrame(HandlerFrame):
+    def __init__(self):
+        super().__init__()
+        self.handlerFunctions = {}
+
+    def addHandler(self, name, function: SystemFunction):
+        copy = self.__copy__()
+        copy.handlerFunctions[name] = function
+        return copy
+
+    def hasHandler(self, name):
+        return name in self.handlerFunctions.keys()
+
+    def invokeHandler(self, callingFrame: StackFrame, name: str, values: list) -> StackFrame:
+        if not self.hasHandler(name):
+            callingFrame.throwError(f"Handler for function '{name}' not found.")
+        boundFunc: Lambda = self.handlerFunctions[name]
+        for i in values:
+            boundFunc = boundFunc.bind(i, callingFrame)
+        return boundFunc.createEvaluationFrame(callingFrame)
+
+    def errorDumpSerialize(self):
+        return f"SystemHandlerFrame<{', '.join(self.handlerFunctions.keys())}>"
+
+    def equals(self, other):
+        raise NotImplementedError()
+
+    def __copy__(self):
+        theCopy = SystemHandlerFrame()
+        theCopy.handlerFunctions = self.handlerFunctions.copy()
+        return theCopy
+
+
+class UserHandlerFrame(HandlerFrame):
+    def __init__(self, handlerID, branchPointFrame: StackFrame):
+        super().__init__()
         self.__handlerSet__ = {}
         self.parent = None
         self.handlerID = handlerID
@@ -541,13 +570,6 @@ class HandlerFrame(Value):
         copy.__handlerSet__[name] = value
         return copy
 
-    def setHandlerState(self, state) -> HandlerFrame:
-        HandlerStateSingleton.setState(self.handlerID, state)
-        return self
-
-    def getHandlerState(self) -> Value:
-        return HandlerStateSingleton.retrieveState(self.handlerID)
-
     def hasHandler(self, name):
         if name in self.__handlerSet__.keys():
             return True
@@ -555,19 +577,36 @@ class HandlerFrame(Value):
             return self.parent.hasHandler(name)
         return False
 
-    def getHandler(self, callingFrame: StackFrame, name):
-        if name in self.__handlerSet__.keys():
-            return self.__handlerSet__[name]
-        if self.parent is not None:
-            return self.parent.getHandler(callingFrame, name)
-        callingFrame.throwError(f"Could not retrieve handler. Handler for '{name}' doesnt exist.")
+    def invokeHandler(self, callingFrame: StackFrame, name: str, values: list) -> StackFrame:
+        if name not in self.__handlerSet__.keys():
+            if self.parent is None:
+                callingFrame.throwError(f"Handler for '{name}' doesnt exist.")
+            return self.parent.invokeHandler(callingFrame, name, values)
 
-    def getHandlerFrame(self, callingFrame: StackFrame, name):
-        if name in self.__handlerSet__.keys():
-            return self
-        if self.parent is not None:
-            return self.parent.getHandlerFrame(callingFrame, name)
-        callingFrame.throwError(f"Could not retrieve handlerFrame. Handler for '{name}' doesnt exist.")
+        handlerFunc: Lambda = self.__handlerSet__[name]
+        handlerFunc = handlerFunc.bind(
+            HandlerStateSingleton.retrieveState(self.handlerID),
+            callingFrame
+        )
+        for arg in values:
+            if handlerFunc.canRun():
+                callingFrame.throwError(f"Too many arguments exist in the handler '{name}' invocation.")
+            handlerFunc = handlerFunc.bind(arg, callingFrame)
+
+        if not handlerFunc.canRun():
+            callingFrame.throwError(f"Too few arguments for handler '{name}' invocation")
+
+        branchPointFrame = self.branchPointFrame
+
+        # The created continue value should be added like a lambda return below the calling frame, if its continued.
+        newBranchpointFrame = branchPointFrame.withExecutionState(
+            HandleBranchPoint(self.handlerID, continueBranch=callingFrame))
+
+        # The handle branch point frame is used as the parent of the new branch, to make sure the returned value
+        # returns to the branch value. Branch value frame doesn't have the handler set being used here.
+        handleFuncRunningFrame = handlerFunc.createEvaluationFrame(newBranchpointFrame)
+
+        return handleFuncRunningFrame
 
     def errorDumpSerialize(self):
         return "<Captured handler frame>"
@@ -576,7 +615,7 @@ class HandlerFrame(Value):
         raise NotImplementedError()
 
     def __copy__(self):
-        theCopy = HandlerFrame(self.handlerID, self.branchPointFrame)
+        theCopy = UserHandlerFrame(self.handlerID, self.branchPointFrame)
         theCopy.__handlerSet__ = self.__handlerSet__.copy()
         return theCopy
 
@@ -704,7 +743,7 @@ class StackFrame:
 
     #Handler logic
 
-    def withHandlerFrame(self, handlerFrame: HandlerFrame) -> StackFrame:
+    def withHandlerFrame(self, handlerFrame: UserHandlerFrame) -> StackFrame:
         copy = self.__copy__()
         copy.closestHandlerFrame = handlerFrame
         return copy
@@ -714,15 +753,8 @@ class StackFrame:
             return self.closestHandlerFrame.hasHandler(name)
         return False
 
-    def getHandler(self, name):
-        if not self.hasHandler(name):
-            self.throwError("Tried to retrieve a handler that doesnt exist. Engine error.")
-        return self.closestHandlerFrame.getHandler(self, name)
-
-    def getHandlerFrame(self, name) -> HandlerFrame:
-        if self.closestHandlerFrame is not None:
-            return self.closestHandlerFrame.getHandlerFrame(self, name)
-        self.throwError("No handler exists")
+    def invokeHandler(self, name, args) -> StackFrame:
+        return self.closestHandlerFrame.invokeHandler(self, name, args)
 
     #Utility logic
 

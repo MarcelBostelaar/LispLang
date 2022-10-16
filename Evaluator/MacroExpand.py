@@ -99,7 +99,7 @@ def handleNotAList(currentFrame: StackFrame) -> Value:
         if currentFrame.hasScopedMacroValue(currentFrame.executionState[0].value):
             currentFrame.throwError("Found a macro without any code behind it, invalid macro usage")
     # its a literal.
-    return currentFrame.executionState[0]
+    return currentFrame.executionState
 
 
 def DemacroTop(currentFrame: StackFrame) -> Value:

@@ -1,9 +1,9 @@
 import Evaluator.SupportFunctions
-from Evaluator import EvaluatorCode
+from Evaluator.EvaluatorCode import Eval
 from Evaluator.MacroExpand import DemacroTop
 from Parser.ParserCode import parseAll
 from Parser.ParserCombinator import SOF_value, EOF_value
-from Config.standardLibrary import outerDefaultRuntimeFrame
+from Config.standardLibrary import outerDefaultRuntimeFrame, demacroOuterDefaultRuntimeFrame
 
 
 def tokenizeParse(text):
@@ -40,26 +40,17 @@ def main(*argv):
 
     if command in ["eval", "evaluate"]:
         ast = Evaluator.SupportFunctions.toAST(parsed.content)
-        demacroedCode = DemacroTop(ast, outerDefaultRuntimeFrame)
-        result = Evaluator.Eval(demacroedCode, outerDefaultRuntimeFrame)
+        demacroedCode = DemacroTop(demacroOuterDefaultRuntimeFrame.createChild(ast))
+        result = Eval(outerDefaultRuntimeFrame.createChild(demacroedCode))
         print(result.serializeLLQ())
 
     if command in ["compile", "c"]:
-        demacroedCode = DemacroTop(parsed.content, outerDefaultRuntimeFrame)
+        demacroedCode = DemacroTop(demacroOuterDefaultRuntimeFrame.createChild(parsed.content))
         targetFile = next(args)
         serialized = demacroedCode.serializeLLQ()
         f = open(targetFile, "w")
         f.write(serialized)
         f.close()
-
-    # if command in ["runCompiled", "rc"]:
-    #     ast = Evaluator.toAST(parsed.content)
-    #     result = Evaluator.Eval(ast, Scope(None))
-    #     print(result.serialize())
-
-    if command in ["step"]:
-        print("Will not be implemented via python, can be easily implemented using "
-              "algebraic effects in the self hosted compiler")
 
 
 if __name__ == '__main__':

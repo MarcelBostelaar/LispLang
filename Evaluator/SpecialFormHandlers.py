@@ -1,6 +1,6 @@
 from Config.langConfig import SpecialForms
 from Evaluator.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandlerFrame, \
-    HandleReturnValue, HandleBranchPoint
+    HandleReturnValue, HandleBranchPoint, UserHandlerFrame
 from Evaluator.HandlerStateRegistry import HandlerStateSingleton
 from Evaluator.SupportFunctions import dereference, MustBeKind, SpecialFormSlicer, QuoteCode
 
@@ -116,7 +116,7 @@ def handleSpecialFormHandle(currentFrame: StackFrame) -> StackFrame:
     #Should NOT contain the handlers, and only the branch point. Handles a possible branch moment.
     branchFrame = newParentFrame.createChild(HandleBranchPoint(handlerID))
 
-    newHandler = HandlerFrame(handlerID, branchFrame)
+    newHandler = UserHandlerFrame(handlerID, branchFrame)
     newHandler.parent = currentFrame.closestHandlerFrame
 
     for i in handlerQuotekeyValuePairs.value:
