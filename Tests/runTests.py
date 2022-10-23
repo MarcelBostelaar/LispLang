@@ -1,7 +1,7 @@
 from functools import partial
 
-from Config import errorMessages
-from Parser.ParserCombinator import ParseError
+from LispLangInterpreter.Config import errorMessages
+from LispLangInterpreter.Parser.ParserCombinator import ParseError
 from Tests.CompileTests.TestRunner import compileTest
 from Tests.ParseTests.TestRunner import parseTest, parseErrorTest
 

@@ -1,8 +1,8 @@
-from Evaluator.Classes import sExpression, Kind, StackFrame, Value, \
-    StackReturnValue, Lambda, HandleBranchPoint, ContinueStop, Unit
-from Evaluator.HandlerStateRegistry import HandlerStateSingleton
-from Evaluator.SpecialFormHandlers import ExecuteSpecialForm
-from Evaluator.SupportFunctions import dereference, isSpecialFormKeyword
+from ..DataStructures.Classes import sExpression, Kind, StackFrame, Value, \
+    StackReturnValue, Lambda, HandleBranchPoint, ContinueStop
+from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
+from .SpecialFormHandlers import ExecuteSpecialForm
+from ..DataStructures.SupportFunctions import isIndirectionValue, dereference, isSpecialFormKeyword
 
 """Only operates on demacroed code"""
 
@@ -81,7 +81,7 @@ def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
     """
     if currentFrame.executionState.kind == Kind.HandleBranchPoint:
         return EvalHandleTopLevelValueHandleBranchPoint(currentFrame)
-    elif currentFrame.executionState.kind in [Kind.Reference, Kind.HandleInProgress, Kind.StackReturnValue]:
+    elif isIndirectionValue(currentFrame.executionState):
         resultValue = dereference(currentFrame)
     else:
         resultValue = currentFrame.executionState

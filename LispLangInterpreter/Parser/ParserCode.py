@@ -1,10 +1,10 @@
 import string
 
-import Config.langConfig
-from Config import errorMessages
-from Config.langConfig import separateSymbols
-from Evaluator.Classes import QuotedName, List, Char, Boolean, Number, Unit
-from Parser.ParserCombinator import MS, Any, SOF, EOF, reduceOR, AnyOfMS, ConcatStrings, MC
+from ..Config import langConfig
+from ..Config import errorMessages
+from ..Config.langConfig import separateSymbols
+from LispLangInterpreter.DataStructures.Classes import QuotedName, List, Char, Boolean, Number, Unit
+from ..Parser.ParserCombinator import MS, Any, SOF, EOF, reduceOR, AnyOfMS, ConcatStrings, MC
 
 linebreaks = MS("\n").OR(MS("\r"))
 whitespace = linebreaks.OR(MS("\t")).OR(MS(" "))
@@ -64,7 +64,7 @@ char = MC("c").ignore().then(stringBase(1, 1)).mapResult(Char)
 stringChars = stringCombinator.OR(char)
 
 bools = MS("true").OR(MS("false")).mapSingle(Boolean)
-unit = MS(Config.langConfig.unitKeyword).mapResult(lambda x: [Unit()])
+unit = MS(langConfig.unitKeyword).mapResult(lambda x: [Unit()])
 num0to9 = AnyOfMS(*list("1234567890"))
 num1to9 = AnyOfMS(*list("123456789"))
 positiveIntegers = num1to9.then(num0to9.many(0))

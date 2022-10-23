@@ -1,18 +1,15 @@
-import Evaluator.SupportFunctions
-from Config.ConfigClasses import exampleConfig
-from Evaluator.Classes import StackFrame, StackReturnValue
-from Evaluator.EvaluatorCode import Eval
-from Evaluator.MacroExpand import DemacroTop
-from Parser.ParserCode import parseAll
-from Parser.ParserCombinator import SOF_value, EOF_value
-from Config.standardLibraryBuilder import outerDefaultRuntimeFrame, demacroOuterDefaultRuntimeFrame, \
-    systemHandlerBuilder, standardLibraryBuilder
+import LispLangInterpreter.Evaluator.SupportFunctions
+from LispLangInterpreter.ImportHandlerSystem.Handler import SystemHandlerImporter
+from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import exampleConfig
+from LispLangInterpreter.DataStructures.Classes import StackFrame, StackReturnValue
+from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
+from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
+from LispLangInterpreter.Parser.ParserCode import parseAll
+from LispLangInterpreter.Parser.ParserCombinator import SOF_value, EOF_value
+from LispLangInterpreter.Evaluator.SupportFunctions import toAST
 import os.path
 import json
 
-#TODO temp
-import Libraries.StandardLibrary
-#TODO end temp
 
 configPath = "config.json"
 
@@ -36,9 +33,9 @@ def getConfig():
 
 
 def main(*argv):
-    config= getConfig()
+    config = getConfig()
 
-    frame = standardLibraryBuilder(config["standardLibrary"], StackFrame(StackReturnValue()))
+    # frame = standardLibraryBuilder(config["standardLibrary"], StackFrame(StackReturnValue()))
 
     args = iter(argv)
     _ = next(args)
@@ -68,13 +65,14 @@ def main(*argv):
         print(parsed.content.serializeLLQ())
 
     if command in ["eval", "evaluate"]:
-        ast = Evaluator.SupportFunctions.toAST(parsed.content)
-        demacroedCode = DemacroTop(demacroOuterDefaultRuntimeFrame.createChild(ast))
-        result = Eval(outerDefaultRuntimeFrame.createChild(demacroedCode))
+        ast = toAST(parsed.content)
+        demacroedCode = DemacroTop(StackFrame(ast).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
+        result = Eval(StackFrame(demacroedCode).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
         print(result.serializeLLQ())
 
     if command in ["compile", "c"]:
-        demacroedCode = DemacroTop(demacroOuterDefaultRuntimeFrame.createChild(parsed.content))
+        ast = toAST(parsed.content)
+        demacroedCode = DemacroTop(StackFrame(ast).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
         targetFile = next(args)
         serialized = demacroedCode.serializeLLQ()
         f = open(targetFile, "w")

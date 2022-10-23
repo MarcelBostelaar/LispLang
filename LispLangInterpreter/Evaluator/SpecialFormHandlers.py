@@ -1,8 +1,8 @@
-from Config.langConfig import SpecialForms
-from Evaluator.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandlerFrame, \
-    HandleReturnValue, HandleBranchPoint, UserHandlerFrame
-from Evaluator.HandlerStateRegistry import HandlerStateSingleton
-from Evaluator.SupportFunctions import dereference, MustBeKind, SpecialFormSlicer, QuoteCode
+from ..Config.langConfig import SpecialForms
+from ..DataStructures.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandleReturnValue, HandleBranchPoint, UserHandlerFrame
+from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
+from ..DataStructures.SupportFunctions import isIndirectionValue, dereference
+from .SupportFunctions import MustBeKind, SpecialFormSlicer, QuoteCode
 
 
 def handleSpecialFormCond(currentFrame: StackFrame):
@@ -63,7 +63,11 @@ def handleSpecialFormList(currentFrame):
             else:
                 listMapped.append(i)
         else:
-            listMapped.append(dereference(currentFrame.withExecutionState(i)))
+            if isIndirectionValue(i):
+                valueToAppend = dereference(currentFrame.withExecutionState(i))
+            else:
+                valueToAppend = i
+            listMapped.append(valueToAppend)
 
     # if a subexpression was found and replaced, make it into a new stackframe, with parent being the updates list
     if newStackExpression is not None:

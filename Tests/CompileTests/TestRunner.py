@@ -1,8 +1,8 @@
 from termcolor import cprint
 
-from Config.standardLibraryBuilder import outerDefaultRuntimeFrame
-from Evaluator.Classes import RuntimeEvaluationError
-from Evaluator.MacroExpand import DemacroTop
+from LispLangInterpreter.Config.standardLibraryBuilder import outerDefaultRuntimeFrame
+from LispLangInterpreter.Evaluator.Classes import RuntimeEvaluationError
+from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
 from main import tokenizeParse
 
 

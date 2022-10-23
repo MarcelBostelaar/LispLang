@@ -1,10 +1,9 @@
 import string
 import uuid
 
-from Config.langConfig import continueKeyword, stopKeyword
-from Evaluator.SupportFunctions import MustBeKind
-from Evaluator.Classes import List, Kind, SystemFunction, Boolean, StackFrame, StackReturnValue, Number, ContinueStop, \
-    UnfinishedHandlerInvocation, Unit, SystemHandlerFrame, QuotedName, Reference, sExpression
+from LispLangInterpreter.Evaluator.SupportFunctions import MustBeKind
+from LispLangInterpreter.DataStructures.Classes import List, Kind, SystemFunction, Boolean, StackFrame, Number, ContinueStop, \
+    UnfinishedHandlerInvocation, Unit, QuotedName
 
 
 def headf(somelist: List, callingFrame: StackFrame):
@@ -27,23 +26,27 @@ def concatf(listA, listB, callingFrame: StackFrame):
 concat = SystemFunction(concatf, 2)
 
 
-def equals(A, B, callingFrame: StackFrame):
+def equalsf(A, B, callingFrame: StackFrame):
     return Boolean(A.equals(B))
+equals = SystemFunction(equalsf, 2)
 
 
-def sum(A, B, callingFrame: StackFrame):
+def sumf(A, B, callingFrame: StackFrame):
     MustBeKind(callingFrame, A, "sum can only add numbers", Kind.Number)
     MustBeKind(callingFrame, B, "sum can only add numbers", Kind.Number)
     return Number(A.value + B.value)
+sum = SystemFunction(sumf, 2)
 
 
 def continueStop(isContinue):
     def internal(returnValue, newState, callingFrame: StackFrame):
         return ContinueStop(isContinue, returnValue, newState)
     return internal
+continue_ = SystemFunction(continueStop(True), 2)
+stop_ = SystemFunction(continueStop(False), 2)
 
 
-def handlerInvocationDefinition(name, length, callingFrame: StackFrame):
+def handlerInvocationDefinitionf(name, length, callingFrame: StackFrame):
     MustBeKind(callingFrame, name, "Handler invocation definition must give as the first argument, the handled name as a quoted name", Kind.QuotedName)
     MustBeKind(callingFrame, length, "Handler invocation definition must give as second argument, its length with a number", Kind.Number)
     if length.value < 1:
@@ -51,18 +54,19 @@ def handlerInvocationDefinition(name, length, callingFrame: StackFrame):
     if not length.value.is_integer():
         callingFrame.throwError("Length of handler invocation definition must be a whole number")
     return UnfinishedHandlerInvocation(name.value, length.value)
+handlerInvocationDefinition = SystemFunction(handlerInvocationDefinitionf, 2)
 
-
-def isString(value):
+def isStringf(value):
     if value.kind is not Kind.List:
         return False
     for i in value.value:
         if i.Kind is not Kind.Char:
             return False
     return True
+isString = SystemFunction(isStringf, 1)
 
 
-def printFunction(value, callingFrame: StackFrame):
+def printFunctionf(value, callingFrame: StackFrame):
     if value.kind in [Kind.Number, Kind.Boolean]:
         print(value.value)
     elif isString(value):
@@ -70,9 +74,11 @@ def printFunction(value, callingFrame: StackFrame):
     else:
         callingFrame.throwError("Unsupported type to print")
     return Unit()
+printFunction = SystemFunction(printFunctionf, 1)
 
 
 def symGenFunction(_, callingFrame):
     id = uuid.uuid4()
     id = id.__str__()
     return QuotedName("generatedSymbol_" + "".join([x for x in id if x in string.ascii_letters + "0123456789"]))
+symGen = SystemFunction(symGenFunction, 1)

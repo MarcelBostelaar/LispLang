@@ -3,10 +3,11 @@ from __future__ import annotations
 import functools
 from enum import Enum
 from termcolor import cprint
-import Config.langConfig
-from Config import langConfig
-from Evaluator import SupportFunctions
-from Evaluator.HandlerStateRegistry import HandlerStateSingleton
+
+from ..Config import langConfig
+from .HandlerStateRegistry import HandlerStateSingleton
+from .SupportFunctions import escape_string, checkReservedKeyword, isIndirectionValue, \
+    dereference
 
 
 class Kind(Enum):
@@ -21,7 +22,7 @@ class Kind(Enum):
     Scope = 9
     StackReturnValue = 10
     ContinueStop = 11
-    HandleInProgress = 12
+    HandleReturnValue = 12
     HandlerFrame = 13
     HandleBranchPoint = 14
     Unit = 15
@@ -64,7 +65,7 @@ class List(Value):
             # Not a list of chars, ie its not a string
             return "[ " + " ".join([serializeInvocation(x) for x in self.value]) + " ]"
         # Print a list of chars (ie a string) as a string
-        return '"' + "".join([SupportFunctions.escape_string(x.value) for x in self.value]) + '"'
+        return '"' + "".join([escape_string(x.value) for x in self.value]) + '"'
 
     def serializeLLQ(self):
         return self.__abstractSerialize__(lambda x: x.serializeLLQ())
@@ -120,7 +121,7 @@ class Char(Value):
         super().__init__(value, Kind.Char)
 
     def serializeLLQ(self):
-        return 'c"' + SupportFunctions.escape_string(self.value) + '"'
+        return 'c"' + escape_string(self.value) + '"'
 
     def errorDumpSerialize(self):
         return self.serializeLLQ()
@@ -142,7 +143,7 @@ class ContinueStop(Value):
         self.newState = newState
 
     def __unRun__(self) -> Value:
-        keyword = Config.langConfig.continueKeyword if self.isContinue else Config.langConfig.stopKeyword
+        keyword = langConfig.continueKeyword if self.isContinue else langConfig.stopKeyword
         return List([Reference(keyword), self.returnValue, self.newState])
 
     def isSerializable(self):
@@ -395,7 +396,7 @@ class UnfinishedHandlerInvocation(Lambda):
 
 class HandleReturnValue(Value):
     def __init__(self, handlerID):
-        super().__init__(None, Kind.HandleInProgress)
+        super().__init__(None, Kind.HandleReturnValue)
         self.handlerID = handlerID
 
     def errorDumpSerialize(self):
@@ -443,7 +444,7 @@ class Scope(Value):
 
     def hasScopedRegularValue(self, name):
         # Do not check parents, because parent can be a non-captured outer scope
-        if name == Config.langConfig.currentScopeKeyword:
+        if name == langConfig.currentScopeKeyword:
             return True
         if name in self.__scopedNames__.keys():
             return self.__scopedNames__[name] == VarType.Regular
@@ -451,7 +452,7 @@ class Scope(Value):
 
     def retrieveScopedRegularValue(self, callingFrame: StackFrame, name: str) -> Value:
         # Do not check parents, because parent can be a non-captured outer scope
-        if name == Config.langConfig.currentScopeKeyword:
+        if name == langConfig.currentScopeKeyword:
             return self
         if not self.hasScopedRegularValue(name):
             if name not in self.__scopedNames__.keys():
@@ -476,14 +477,14 @@ class Scope(Value):
         return self.__scopedValues__[name]
 
     def addScopedMacroValue(self, callingFrame: StackFrame, name, value) -> Scope:
-        SupportFunctions.checkReservedKeyword(callingFrame, name)
+        checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
         copy.__scopedNames__[name] = VarType.Macro
         copy.__scopedValues__[name] = value
         return copy
 
     def addScopedRegularValue(self, callingFrame: StackFrame, name, value) -> Scope:
-        SupportFunctions.checkReservedKeyword(callingFrame, name)
+        checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
         copy.__scopedNames__[name] = VarType.Regular
         copy.__scopedValues__[name] = value
@@ -564,7 +565,7 @@ class UserHandlerFrame(HandlerFrame):
         self.branchPointFrame = branchPointFrame
 
     def addHandler(self, callingFrame: StackFrame, name, value) -> HandlerFrame:
-        SupportFunctions.checkReservedKeyword(callingFrame, name)
+        checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
         copy.__handlerSet__[name] = value
         return copy
@@ -677,7 +678,8 @@ class StackFrame:
             self.throwError("Tried to evaluate a subitem of a value that isnt an s expression. Engine error.")
         if itemIndex >= len(self.executionState.value):
             self.throwError("Tried to evaluate a subitem that is out of range. Engine error.")
-        return self.executionState.value[itemIndex].kind not in [Kind.sExpression, Kind.StackReturnValue, Kind.Reference]
+        item = self.executionState[itemIndex]
+        return item.kind is not Kind.sExpression and not isIndirectionValue(item)
 
     def SubEvaluate(self, itemIndex) -> StackFrame:
         """
@@ -697,7 +699,7 @@ class StackFrame:
             return newStack
 
         # its indirection
-        trueValue = SupportFunctions.dereference(self.withExecutionState(item))
+        trueValue = dereference(self.withExecutionState(item))
         return self.withExecutionState(sExpression(
             self.executionState.value[:itemIndex] + [trueValue] + self.executionState.value[itemIndex + 1:]
         ))
@@ -742,7 +744,7 @@ class StackFrame:
 
     #Handler logic
 
-    def withHandlerFrame(self, handlerFrame: UserHandlerFrame) -> StackFrame:
+    def withHandlerFrame(self, handlerFrame: HandlerFrame) -> StackFrame:
         copy = self.__copy__()
         copy.closestHandlerFrame = handlerFrame
         return copy
@@ -758,7 +760,7 @@ class StackFrame:
     #Utility logic
 
     def errorDumpSerialize(self):
-        return Config.langConfig.currentScopeKeyword
+        return langConfig.currentScopeKeyword
 
     def debugStateToString(self):
         return self.executionState.errorDumpSerialize()
@@ -785,3 +787,17 @@ class StackFrame:
 
 class RuntimeEvaluationError(Exception):
     pass
+
+#Import classes
+
+
+class PythonImportData:
+    def __init__(self, libraryPath: str, values: [(str, str)]):
+        """
+        Data to import regular values from a python file
+        :param libraryPath: Absolute path to the library file from the root of the interpreter
+        :param values: A string tuple, indicating the original name and the name to import it as
+        """
+        self.libraryPath = libraryPath
+        self.importValues = values
+

@@ -1,12 +1,10 @@
-import importlib.util
+import importlib
 import string
-import sys
 import uuid
 
-from Config.langConfig import continueKeyword, stopKeyword
-from Evaluator.SupportFunctions import MustBeKind
-from Evaluator.Classes import List, Kind, SystemFunction, Boolean, StackFrame, StackReturnValue, Number, ContinueStop, \
-    UnfinishedHandlerInvocation, Unit, SystemHandlerFrame, QuotedName, Reference, sExpression
+from ..Config.langConfig import continueKeyword, stopKeyword
+from ..DataStructures.Classes import *
+from ..Evaluator.SupportFunctions import MustBeKind
 
 
 def head(somelist: List, callingFrame: StackFrame):
@@ -95,44 +93,37 @@ standardLibrary = {
     "isString": SystemFunction(lambda v, c: Boolean(isString(v)), 1)
 }
 
-counter = 1
 modules = {}
 
 
-def systemHandlerBuilder(subConfig):
-    x = SystemHandlerFrame()
-    return dynamicImportBuilder(subConfig, x, lambda i, name, value: i.addHandler(name, value))
+def validatePathForm(path):
+    if path[0] == ".":
+        raise Exception(f"Path for the to import package must be absolute, found {path} instead")
 
 
-def standardLibraryBuilder(subConfig, stackFrame: StackFrame):
-    return dynamicImportBuilder(subConfig, stackFrame, lambda i, name, value: i.addScopedRegularValue(name, value))
+def SystemDataImporter(importData: PythonImportData, callingFrame: StackFrame):
+    """
+    Loads values directly from a python file or module.
+    :param importData:
+    :param callingFrame:
+    :return:
+    """
+    #TODO make this into an effect handler with a macro, remove python import data and use list forms instead
+    validatePathForm(importData.libraryPath)
+    if importData.libraryPath in modules.keys():
+        #Already imported
+        pass
+    else:
+        importedModule = importlib.import_module(importData.libraryPath)
+        modules[importData.libraryPath] = importedModule
 
-
-def standardMacroLibraryBuilder(subConfig, stackFrame: StackFrame):
-    return dynamicImportBuilder(subConfig, stackFrame, lambda i, name, value: i.addScopedMacroValue(name, value))
-
-
-def dynamicImportBuilder(subConfig, addTo, addFunc):
-    for someFile in subConfig:
-        if someFile["path"] in modules.keys():
-            #Already imported
-            pass
-        else:
-            global counter
-            pseudonym = "pseudonymModule" + str(counter)
-            counter += 1
-            exec(f"import {someFile['path']} as {pseudonym}\n"
-                 f"modules['{pseudonym}'] = {pseudonym}"
-                    , globals(), None)
-            # spec = importlib.util.spec_from_file_location(pseudonym, someFile["path"])
-            # foo = importlib.util.module_from_spec(spec)
-            # sys.modules[pseudonym] = foo
-            # spec.loader.exec_module(foo)
-            # modules[someFile["path"]] = foo
-        module = modules[someFile["path"]]
-        for x in someFile["functions"]:
-            addTo = addFunc(addTo, x["exportName"], getattr(module, x["nameInFile"]))
-    return addTo
+    module = modules[importData.libraryPath]
+    for x in importData.importValues:
+        item = getattr(module, x[0])
+        if not issubclass(Value, item):
+            callingFrame.throwError(f"Imported item '{x[0]}' from library file '{importData.libraryPath}' is not an interpreter Value type.")
+        callingFrame = callingFrame.addScopedRegularValue(x[1], item)
+    return callingFrame
 
 
 def makeNormalStartingFrame():

@@ -1,8 +1,7 @@
-import Config.langConfig
-from Evaluator.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, Value, Reference
-from Config.langConfig import SpecialForms
-from Evaluator.EvaluatorCode import Eval
-from Evaluator.SupportFunctions import toAST, MustBeKind, SpecialFormSlicer
+from ..DataStructures.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, Value, Reference
+from ..Config.langConfig import SpecialForms
+from ..Evaluator.EvaluatorCode import Eval
+from .SupportFunctions import toAST, MustBeKind, SpecialFormSlicer
 
 
 def demacroSubelementSingle(currentFrame: StackFrame) -> Value:

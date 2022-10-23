@@ -1,7 +1,9 @@
-from Parser.ParserCombinator import SOF_value, EOF_value
+from ParserCombinator import SOF_value, EOF_value
+
 
 def flatten(list_):
     return [item for sublist in list_ for item in sublist]
+
 
 def removeItem(list_of_stuff, item):
     return [x for x in list_of_stuff if x is not item]

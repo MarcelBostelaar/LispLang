@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 class parseResult:
     def __init__(self, isSucces, content, remaining, errors):
         self.isSucces = isSucces
