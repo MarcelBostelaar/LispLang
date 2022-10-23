@@ -1,0 +1,54 @@
+{
+    "standardLibrary": [
+        {
+            "path": "Libraries.StandardLibrary",
+            "functions": [
+                {
+                    "nameInFile": "head",
+                    "exportName": "head"
+                },
+                {
+                    "nameInFile": "tail",
+                    "exportName": "tail"
+                },
+                {
+                    "nameInFile": "concat",
+                    "exportName": "concat"
+                }
+            ]
+        }
+    ],
+    "standardMacroLibrary": [
+        {
+            "path": "someFile.py",
+            "functions": [
+                {
+                    "nameInFile": "someName",
+                    "exportName": "someOtherName"
+                }
+            ]
+        }
+    ],
+    "handledRuntimeEffects": [
+        {
+            "path": "someFile.py",
+            "functions": [
+                {
+                    "nameInFile": "someName",
+                    "exportName": "someOtherName"
+                }
+            ]
+        }
+    ],
+    "handledMacroEffects": [
+        {
+            "path": "someFile.py",
+            "functions": [
+                {
+                    "nameInFile": "someName",
+                    "exportName": "someOtherName"
+                }
+            ]
+        }
+    ]
+}

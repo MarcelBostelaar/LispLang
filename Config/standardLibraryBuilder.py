@@ -1,4 +1,6 @@
+import importlib.util
 import string
+import sys
 import uuid
 
 from Config.langConfig import continueKeyword, stopKeyword
@@ -77,21 +79,60 @@ def symGenFunction(_, callingFrame):
 
 
 implementedHandlers = {
-    "print": SystemFunction("print", printFunction, 1),
-    "gensym": SystemFunction("gensym", symGenFunction, 1)
+    "print": SystemFunction(printFunction, 1),
+    "gensym": SystemFunction(symGenFunction, 1)
 }
 
 standardLibrary = {
-    "head": SystemFunction("head", head, 1),
-    "tail": SystemFunction("tail", tail, 1),
-    "concat": SystemFunction("concat", concat, 2),
-    "equals": SystemFunction("equals", equals, 2),
-    "sum": SystemFunction("sum", sum, 2),
-    continueKeyword: SystemFunction(continueKeyword, continueStop(True), 2),
-    stopKeyword: SystemFunction(stopKeyword, continueStop(False), 2),
-    "declareEffectfulFunction": SystemFunction("declareEffectfulFunction", handlerInvocationDefinition, 2),
-    "isString": SystemFunction("isString", lambda v, c: Boolean(isString(v)), 1)
+    "head": SystemFunction(head, 1),
+    "tail": SystemFunction(tail, 1),
+    "concat": SystemFunction(concat, 2),
+    "equals": SystemFunction(equals, 2),
+    "sum": SystemFunction(sum, 2),
+    continueKeyword: SystemFunction(continueStop(True), 2),
+    stopKeyword: SystemFunction(continueStop(False), 2),
+    "declareEffectfulFunction": SystemFunction(handlerInvocationDefinition, 2),
+    "isString": SystemFunction(lambda v, c: Boolean(isString(v)), 1)
 }
+
+counter = 1
+modules = {}
+
+
+def systemHandlerBuilder(subConfig):
+    x = SystemHandlerFrame()
+    return dynamicImportBuilder(subConfig, x, lambda i, name, value: i.addHandler(name, value))
+
+
+def standardLibraryBuilder(subConfig, stackFrame: StackFrame):
+    return dynamicImportBuilder(subConfig, stackFrame, lambda i, name, value: i.addScopedRegularValue(name, value))
+
+
+def standardMacroLibraryBuilder(subConfig, stackFrame: StackFrame):
+    return dynamicImportBuilder(subConfig, stackFrame, lambda i, name, value: i.addScopedMacroValue(name, value))
+
+
+def dynamicImportBuilder(subConfig, addTo, addFunc):
+    for someFile in subConfig:
+        if someFile["path"] in modules.keys():
+            #Already imported
+            pass
+        else:
+            global counter
+            pseudonym = "pseudonymModule" + str(counter)
+            counter += 1
+            exec(f"import {someFile['path']} as {pseudonym}\n"
+                 f"modules['{pseudonym}'] = {pseudonym}"
+                    , globals(), None)
+            # spec = importlib.util.spec_from_file_location(pseudonym, someFile["path"])
+            # foo = importlib.util.module_from_spec(spec)
+            # sys.modules[pseudonym] = foo
+            # spec.loader.exec_module(foo)
+            # modules[someFile["path"]] = foo
+        module = modules[someFile["path"]]
+        for x in someFile["functions"]:
+            addTo = addFunc(addTo, x["exportName"], getattr(module, x["nameInFile"]))
+    return addTo
 
 
 def makeNormalStartingFrame():

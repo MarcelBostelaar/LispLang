@@ -1,6 +1,6 @@
 from termcolor import cprint
 
-from Config.standardLibrary import outerDefaultRuntimeFrame
+from Config.standardLibraryBuilder import outerDefaultRuntimeFrame
 from Evaluator.Classes import RuntimeEvaluationError
 from Evaluator.EvaluatorCode import Eval
 from Evaluator.SupportFunctions import toAST

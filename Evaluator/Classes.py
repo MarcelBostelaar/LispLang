@@ -327,11 +327,10 @@ class UserLambda(Lambda):
 class SystemFunction(Lambda):
     """In memory representation of a system function"""
 
-    def __init__(self, name, function, bindingsLeft):
+    def __init__(self, function, bindingsLeft):
         super().__init__()
         self.function = function
         self.bindingsLeft = bindingsLeft
-        self.name = name
 
     def equals(self, other):
         super(SystemFunction, self).equals(other)
@@ -347,10 +346,10 @@ class SystemFunction(Lambda):
     def bind(self, argument, callingFrame):
         if self.bindingsLeft <= 0:
             callingFrame.throwError("Tried to bind to a fully bound system function")
-        return SystemFunction(self.name, functools.partial(self.function, argument), self.bindingsLeft - 1)
+        return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
 
     def errorDumpSerialize(self):
-        return f"SystemFunction<{self.name}>"
+        return f"SystemFunction"
 
 
 class UnfinishedHandlerInvocation(Lambda):
