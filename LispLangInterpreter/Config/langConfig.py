@@ -11,6 +11,9 @@ def c(keyword, length):
     return specialFormConfig(keyword, length)
 
 
+extension = "lisp"
+lispPackageFile = "package"
+
 currentScopeKeyword = "currentScope"
 continueKeyword = "continue"
 stopKeyword = "stop"

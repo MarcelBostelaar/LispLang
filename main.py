@@ -1,5 +1,6 @@
 import LispLangInterpreter.Evaluator.SupportFunctions
 from LispLangInterpreter.ImportHandlerSystem.Handler import SystemHandlerImporter
+from LispLangInterpreter.ImportHandlerSystem.PackageResolver import mapLibrary
 from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import exampleConfig
 from LispLangInterpreter.DataStructures.Classes import StackFrame, StackReturnValue
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
@@ -81,6 +82,9 @@ def main(*argv):
 
 
 if __name__ == '__main__':
+    LibraryFolder = os.path.join(os.path.abspath(os.getcwd()), "Libraries")
+    structure = mapLibrary(LibraryFolder)
+
     main("", "eval", "testcode.lisp")
     #main(*sys.argv)
     pass
