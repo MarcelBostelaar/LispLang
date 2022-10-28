@@ -20,12 +20,5 @@
                 }
             ]
         }
-    ],
-    "sourceFolder": "src",
-    "libraryFallback": {
-        "path": "Libraries",
-        "libraryFallback": {
-            "abspath": "C:\\bintest"
-        }
-    }
+    ]
 }

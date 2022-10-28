@@ -1,7 +1,7 @@
 import LispLangInterpreter.Evaluator.SupportFunctions
 from LispLangInterpreter.ImportHandlerSystem.Handler import SystemHandlerImporter
-from LispLangInterpreter.ImportHandlerSystem.PackageResolver import mapLibrary
-from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import exampleConfig
+from LispLangInterpreter.ImportHandlerSystem.PackageResolver import mapLibrary, makeAbs
+from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import exampleConfig, libraryFallbackWord
 from LispLangInterpreter.DataStructures.Classes import StackFrame, StackReturnValue
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
@@ -36,7 +36,7 @@ def getConfig():
 def main(*argv):
     config = getConfig()
 
-    # frame = standardLibraryBuilder(config["standardLibrary"], StackFrame(StackReturnValue()))
+    structure = mapLibrary(makeAbs(config["sourceFolder"]), config[libraryFallbackWord])
 
     args = iter(argv)
     _ = next(args)
@@ -82,9 +82,6 @@ def main(*argv):
 
 
 if __name__ == '__main__':
-    LibraryFolder = os.path.join(os.path.abspath(os.getcwd()), "Libraries")
-    structure = mapLibrary(LibraryFolder)
-
     main("", "eval", "testcode.lisp")
     #main(*sys.argv)
     pass

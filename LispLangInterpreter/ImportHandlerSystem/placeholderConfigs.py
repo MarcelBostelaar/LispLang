@@ -19,7 +19,16 @@ handleExample = [
     }
 ]
 
+libraryFallbackWord = "libraryFallback"
+
 exampleConfig = {
     "handledRuntimeEffects": handleExample,
     "handledMacroEffects": handleExample,
+    "sourceFolder" : "src",
+    libraryFallbackWord: {
+        "path": "Libraries",
+        libraryFallbackWord: {
+            "abspath": "bin"
+        }
+    }
 }

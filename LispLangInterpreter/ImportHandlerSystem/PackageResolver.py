@@ -3,6 +3,7 @@ from __future__ import annotations
 import os.path
 from typing import List
 
+from .placeholderConfigs import libraryFallbackWord
 from ..Config.langConfig import extension, lispPackageFile
 from os import listdir as __listdir
 from os.path import isfile, join, basename
@@ -105,7 +106,12 @@ class Library(Container):
         self.libraryRoot = splitPathFully(libraryRoot)
 
     def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        return self.getByPath(pathElements)
+        if self.parent is None:
+            return self.getByPath(pathElements)
+        else:
+            if pathElements[0] in self.children.keys():
+                return self.getByPath(pathElements)
+            return self.parent.getInverseRecursively(pathElements)
 
     def getSearchableByPath(self, pathToFind):
         """
@@ -124,6 +130,22 @@ class Library(Container):
                 raise Exception(f"Tried to find a path outside of the library: {pathToFind}")
         foundItem = self.getByPath(splittedPath)
         return foundItem
+
+
+class LibraryWithFallback(Searchable):
+    def __init__(self, primary: Library, fallback: Library | LibraryWithFallback):
+        super().__init__(None)
+        self.primary = primary
+        primary.parent = self
+        self.fallback = fallback
+
+    def getByPath(self, pathElements: [str]) -> Searchable:
+        if pathElements[0] in self.primary.children.keys():
+            return self.primary.getByPath(pathElements)
+        return self.fallback.getByPath(pathElements)
+
+    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
+        return self.getByPath(pathElements)
 
 
 def listdir(folder):
@@ -202,6 +224,21 @@ def mapLispPackage(folder: str) -> LispPackage:
     return LispPackage(name, children).fixChildren()
 
 
-def mapLibrary(rootFolder: str) -> Library:
-    children = genericMapLispFolder(rootFolder)
-    return Library(children, rootFolder).fixChildren()
+def makeAbs(path):
+    return os.path.join(os.path.abspath(os.getcwd()), path)
+
+
+def mapLibrary(primaryAbsPath: str, libraryConfig) -> Library | LibraryWithFallback:
+    if "path" in libraryConfig.keys():
+        fallbackPath = makeAbs(libraryConfig["path"])
+    elif "abspath" in libraryConfig.keys():
+        fallbackPath = libraryConfig["abspath"]
+    else:
+        raise Exception("Path for fallback library not found")
+
+    primary = Library(genericMapLispFolder(primaryAbsPath), primaryAbsPath).fixChildren()
+    if libraryFallbackWord not in libraryConfig.keys():
+        fallback = Library(genericMapLispFolder(fallbackPath), fallbackPath).fixChildren()
+    else:
+        fallback = mapLibrary(fallbackPath, libraryConfig[libraryFallbackWord])
+    return LibraryWithFallback(primary, fallback)
