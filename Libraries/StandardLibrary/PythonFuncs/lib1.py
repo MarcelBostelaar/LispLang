@@ -81,4 +81,4 @@ def symGenFunction(_, callingFrame):
     id = uuid.uuid4()
     id = id.__str__()
     return QuotedName("generatedSymbol_" + "".join([x for x in id if x in string.ascii_letters + "0123456789"]))
-symGen = SystemFunction(symGenFunction, 1)
+genSym = SystemFunction(symGenFunction, 1)

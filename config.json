@@ -21,11 +21,8 @@
             ]
         }
     ],
-    "sourceFolder": "src",
+    "sourceFolder": ".",
     "libraryFallback": {
-        "path": "Libraries",
-        "libraryFallback": {
-            "abspath": "C:\\bintest"
-        }
+        "path": "Libraries"
     }
 }
