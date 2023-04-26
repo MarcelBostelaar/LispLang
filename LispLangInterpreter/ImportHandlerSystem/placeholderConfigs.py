@@ -22,6 +22,8 @@ handleExample = [
 libraryFallbackWord = "libraryFallback"
 
 exampleConfig = {
+    "enableImports": True,
+    "enableExceptions": True,
     "handledRuntimeEffects": handleExample,
     "handledMacroEffects": handleExample,
     "sourceFolder": "src",

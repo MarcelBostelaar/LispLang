@@ -1,4 +1,6 @@
 {
+    "enableImports": true,
+    "enableExceptions": true,
     "handledRuntimeEffects": [
         {
             "path": "Libraries.Exceptions",
