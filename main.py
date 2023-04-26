@@ -63,22 +63,26 @@ def main(*argv):
         exit(1)
 
     if command in ["parse"]:
-        print(parsed.content.serializeLLQ())
+        # print(parsed.content.serializeLLQ())
+        pass
 
     if command in ["eval", "evaluate"]:
         ast = toAST(parsed.content)
+        #load source tree
+        #put source tree into stackframe
         demacroedCode = DemacroTop(StackFrame(ast).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
         result = Eval(StackFrame(demacroedCode).withHandlerFrame(SystemHandlerImporter(config["handledRuntimeEffects"])))
         print(result.serializeLLQ())
 
     if command in ["compile", "c"]:
-        ast = toAST(parsed.content)
-        demacroedCode = DemacroTop(StackFrame(ast).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
-        targetFile = next(args)
-        serialized = demacroedCode.serializeLLQ()
-        f = open(targetFile, "w")
-        f.write(serialized)
-        f.close()
+        # ast = toAST(parsed.content)
+        # demacroedCode = DemacroTop(StackFrame(ast).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
+        # targetFile = next(args)
+        # serialized = demacroedCode.serializeLLQ()
+        # f = open(targetFile, "w")
+        # f.write(serialized)
+        # f.close()
+        pass
 
 
 if __name__ == '__main__':

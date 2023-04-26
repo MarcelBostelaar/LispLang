@@ -9,6 +9,7 @@ class Searchable:
         self.name = name
         self.parent = None
         self.isCompiled = isCompiled
+        self.values = {}
 
     def getByPath(self, pathElements: [str]) -> Searchable:
         """Retrieves the specified subelements of this searchable"""

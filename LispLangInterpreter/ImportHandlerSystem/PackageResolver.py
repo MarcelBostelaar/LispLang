@@ -53,12 +53,17 @@ def isLispFile(path: str) -> bool:
 
 def genericMapLispFolder(folder: str) -> [Searchable]:
     files = getFilesIn(folder)
-    pythonFiles: List[Searchable] = [Leaf(x, False) for x in files if isPythonFile(x)]
-    lispFiles = [Leaf(x, True) for x in files if isLispFile(x)]
+    pythonFiles: List[Searchable] = [Leaf(basename(x), False) for x in files if isPythonFile(x)]
+    lispFiles = [Leaf(basename(x), True) for x in files if isLispFile(x)]
+
     folders = getFoldersIn(folder)
-    regularFolders = [mapRegularFolder(x) for x in folders if not isLispPackage(x) and not isPythonPackage(x)]
-    lispSubpackages = [mapLispPackage(x) for x in folders if isLispPackage(x)]
-    pythonSubpackages = [mapPythonPackage(x) for x in folders if isPythonPackage(x)]
+    regularFolders = [x for x in folders if not isLispPackage(x) and not isPythonPackage(x)]
+    lispFolders = [x for x in folders if isLispPackage(x)]
+    pythonFolder = [x for x in folders if isPythonPackage(x)]
+
+    regularFolders = [mapRegularFolder(x) for x in regularFolders]
+    lispSubpackages = [mapLispPackage(x) for x in lispFolders]
+    pythonSubpackages = [mapPythonPackage(x) for x in pythonFolder]
 
     return pythonFiles + lispFiles + regularFolders + lispSubpackages + pythonSubpackages
 
@@ -72,7 +77,7 @@ def mapRegularFolder(folder: str) -> Folder:
 
 def mapPythonPackage(folder: str) -> PythonPackage:
     subPackages: List[Searchable] = [mapPythonPackage(x) for x in getFoldersIn(folder) if isPythonPackage(x)]
-    files = [Leaf(x, False) for x in getFilesIn(folder) if isPythonFile(x)]
+    files = [Leaf(basename(x), False) for x in getFilesIn(folder) if isPythonFile(x)]
     return PythonPackage(basename(folder), subPackages + files).fixChildren()
 
 
