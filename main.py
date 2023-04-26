@@ -68,7 +68,7 @@ def main(*argv):
     if command in ["eval", "evaluate"]:
         ast = toAST(parsed.content)
         demacroedCode = DemacroTop(StackFrame(ast).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
-        result = Eval(StackFrame(demacroedCode).withHandlerFrame(SystemHandlerImporter(config["handledMacroEffects"])))
+        result = Eval(StackFrame(demacroedCode).withHandlerFrame(SystemHandlerImporter(config["handledRuntimeEffects"])))
         print(result.serializeLLQ())
 
     if command in ["compile", "c"]:

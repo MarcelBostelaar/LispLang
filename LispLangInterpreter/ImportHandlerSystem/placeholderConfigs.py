@@ -24,7 +24,7 @@ libraryFallbackWord = "libraryFallback"
 exampleConfig = {
     "handledRuntimeEffects": handleExample,
     "handledMacroEffects": handleExample,
-    "sourceFolder" : "src",
+    "sourceFolder": "src",
     libraryFallbackWord: {
         "path": "Libraries",
         libraryFallbackWord: {
