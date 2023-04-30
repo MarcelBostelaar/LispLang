@@ -8,6 +8,7 @@ from ..Config import langConfig
 from .HandlerStateRegistry import HandlerStateSingleton
 from .SupportFunctions import escape_string, checkReservedKeyword, isIndirectionValue, \
     dereference
+from ..ImportHandlerSystem.LibraryClasses import Searchable
 
 
 class Kind(Enum):
@@ -437,10 +438,11 @@ class Scope(Value):
     """
     Represents the current scope of values
     """
-    def __init__(self):
+    def __init__(self, currentFile: Searchable):
         super().__init__(None, Kind.Scope)
         self.__scopedNames__ = {}
         self.__scopedValues__ = {}
+        self.currentFile = currentFile
 
     def hasScopedRegularValue(self, name):
         # Do not check parents, because parent can be a non-captured outer scope
@@ -634,7 +636,7 @@ class StackReturnValue(Value):
 class StackFrame:
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
 
-    def __init__(self, executionState):
+    def __init__(self, executionState, currentFile: Searchable):
         self.executionState = executionState
         """Read only. Current code being operated on in this frame."""
         self.parent = None
@@ -643,10 +645,10 @@ class StackFrame:
         """Handler stack is seperate, code stack only keeps track of which stack is reachable to it. 
         Other interactions are done through the evaluator code."""
         self.__childReturnValue__ = None
-        self.currentScope = Scope()
+        self.currentScope = Scope(currentFile)
 
     def __copy__(self) -> StackFrame:
-        newcopy = StackFrame(self.executionState)
+        newcopy = StackFrame(self.executionState, self.currentScope.currentFile)
         newcopy.currentScope = self.currentScope.__copy__()
         newcopy.closestHandlerFrame = self.closestHandlerFrame
         newcopy.__childReturnValue__ = self.__childReturnValue__

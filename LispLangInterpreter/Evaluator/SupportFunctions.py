@@ -29,6 +29,15 @@ def MustBeKind(containingStack: StackFrame, expression, message: str, *kinds: [K
     containingStack.throwError(message + "\nIt has type " + expression.kind.name)
 
 
+def MustBeString(containingStack: StackFrame, expression, message: str):
+    if expression.kind != Kind.List:
+        containingStack.throwError(message + "\nIt has type " + expression.kind.name)
+    for i in expression.value:
+        if i.kind != Kind.Char:
+            containingStack.throwError(message + "\nIt contains type " + i.kind.name)
+    return
+
+
 def QuoteCode(frame: StackFrame, expression):
     if expression.kind == Kind.sExpression:
         return List([QuoteCode(frame, x) for x in expression.value])

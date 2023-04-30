@@ -1,8 +1,35 @@
+from .runFile import runFile
 from ..Config.langConfig import SpecialForms
 from ..DataStructures.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandleReturnValue, HandleBranchPoint, UserHandlerFrame
 from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
 from ..DataStructures.SupportFunctions import isIndirectionValue, dereference
-from .SupportFunctions import MustBeKind, SpecialFormSlicer, QuoteCode
+from .SupportFunctions import MustBeKind, SpecialFormSlicer, QuoteCode, MustBeString
+from ..ImportHandlerSystem.LibraryClasses import CompileStatus
+
+
+def handleSpecialFormImport(currentFrame: StackFrame):
+    [[_, what, saveAs], tail] = \
+        SpecialFormSlicer(currentFrame, SpecialForms.import__)
+    MustBeKind(currentFrame, what, "Import must be an unquoted list of strings", Kind.sExpression)
+    MustBeKind(currentFrame, saveAs, "Target name must be a reference", Kind.Reference)
+    for i in what.value:
+        MustBeString(currentFrame, i, "The value for a path must be a string")
+    pathItems = ["".join(x) for x in what.value.value]
+    targetFile = currentFrame.currentScope.currentFile.getSearchable(pathItems)
+    if targetFile is None:
+        currentFrame.throwError("Could not find " + ".".join(pathItems))
+    if targetFile.compileStatus == CompileStatus.Compiling:
+        currentFrame.throwError("Circular file dependency detected when trying to retrieve " + ".".join(pathItems))
+    elif targetFile.compileStatus == CompileStatus.Uncompiled:
+        targetFile.compileStatus = CompileStatus.Compiling
+        runFile(targetFile)
+        targetFile.compileStatus = CompileStatus.Compiled
+
+    #already compiled or compilation just took place, try to retrieve value
+    value = targetFile.getValue(pathItems[-1])
+    if value is None:
+        currentFrame.throwError(f"Could not find value {pathItems[-1]} in {'.'.join(pathItems)}")
+    return currentFrame.withExecutionState(tail).addScopedRegularValue(saveAs.value, value)
 
 
 def handleSpecialFormCond(currentFrame: StackFrame):
@@ -171,5 +198,8 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
 
     if name == SpecialForms.ignore.value.keyword:
         return handleSpecialFormIgnore(currentFrame)
+
+    if name == SpecialForms.import__.value.keyword:
+        return handleSpecialFormImport(currentFrame)
 
     currentFrame.throwError("Unknown special form (engine bug)")

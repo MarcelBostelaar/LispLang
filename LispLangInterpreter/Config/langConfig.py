@@ -37,4 +37,5 @@ class SpecialForms(Enum):
     cond = c("cond", 4) #cond bool truepath falsepath
     ignore = c("ignore", 2) #ignore (somevalue or function)
     handle = c("handle", 4) #handle effectfullCode '[[handlername @handler1] [handlername2 @handler2] etc]] stateSeed
+    import__ = c("__import", 3) #__import [path elements in order] asName
 

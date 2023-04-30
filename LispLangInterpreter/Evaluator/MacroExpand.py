@@ -24,8 +24,7 @@ def handleMacroInvocation(currentFrame: StackFrame) -> Value:
     head = currentFrame.executionState.value[0]
     tail = currentFrame.executionState.value[1:]
     lambdaVal: Lambda = currentFrame.retrieveScopedMacroValue(head.value)
-    newFrame = StackFrame(sExpression([lambdaVal, Reference(Config.langConfig.currentScopeKeyword), List(tail)]))
-    newFrame.currentScope = currentFrame.currentScope
+    newFrame = currentFrame.withExecutionState(sExpression([lambdaVal, Reference(Config.langConfig.currentScopeKeyword), List(tail)]))
     result = Eval(newFrame)
     if not result.isSerializable():
         currentFrame.throwError("Macro returned something non-serializable (not LLQ)")
