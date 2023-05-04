@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import os
-from enum import Enum
 from os.path import basename
 from typing import List
 
@@ -11,14 +10,9 @@ from LispLangInterpreter.DataStructures.Classes import StackFrame
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
 from LispLangInterpreter.Evaluator.SupportFunctions import toAST
+from LispLangInterpreter.ImportHandlerSystem.CompileStatus import CompileStatus
 from LispLangInterpreter.Parser.ParserCode import parseAll
 from LispLangInterpreter.Parser.ParserCombinator import SOF_value, EOF_value
-
-
-class CompileStatus(Enum):
-    Uncompiled = 0
-    Compiling = 1
-    Compiled = 2
 
 
 class Searchable:
@@ -51,7 +45,7 @@ class Searchable:
 
 class Leaf(Searchable):
     def __init__(self, absPath, isLisp):
-        super().__init__(absPath,CompileStatus.Uncompiled)
+        super().__init__(absPath, CompileStatus.Uncompiled)
         self.isLisp = isLisp
         self.data = None
 
@@ -143,7 +137,7 @@ class Library(Container):
 
 class LibraryWithFallback(Searchable):
     def __init__(self, primary: Library, fallback: Library | LibraryWithFallback):
-        super().__init__(None, #virtual folder
+        super().__init__(None,  #virtual folder
                          CompileStatus.Compiled
                          if primary.compileStatus == fallback.compileStatus == CompileStatus.Compiled
                          else CompileStatus.Uncompiled)

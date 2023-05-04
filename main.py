@@ -1,4 +1,4 @@
-from LispLangInterpreter.Evaluator.runFile import getConfig, tokenizeParse, start
+from LispLangInterpreter.Evaluator.runFile import getConfig, start
 from LispLangInterpreter.ImportHandlerSystem.Handler import SystemHandlerImporter
 from LispLangInterpreter.ImportHandlerSystem.PackageResolver import mapLibrary, makeAbs
 from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import libraryFallbackWord
@@ -27,7 +27,8 @@ def main(*argv):
         print("compile / c <targetFile> - compiles the code to the specified file (currently de-macros)")
         exit(0)
 
-    parsed = tokenizeParse(open(next(args)).read())
+    parsed = None#tokenizeParse(open(next(args)).read())
+    raise NotImplementedError()
     if not parsed.isSucces:
         print("Could not parse: ")
         print(parsed.remaining)

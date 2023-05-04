@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import functools
 from enum import Enum
+from typing import TYPE_CHECKING
+
 from termcolor import cprint
 
 from ..Config import langConfig
 from .HandlerStateRegistry import HandlerStateSingleton
 from .SupportFunctions import escape_string, checkReservedKeyword, isIndirectionValue, \
     dereference
-from ..ImportHandlerSystem.LibraryClasses import Searchable
+if TYPE_CHECKING:
+    from ..ImportHandlerSystem.LibraryClasses import Searchable
 
 
 class Kind(Enum):

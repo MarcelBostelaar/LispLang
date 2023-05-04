@@ -3,7 +3,7 @@ from ..DataStructures.Classes import StackFrame, Kind, sExpression, StackReturnV
 from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
 from ..DataStructures.SupportFunctions import isIndirectionValue, dereference
 from .SupportFunctions import MustBeKind, SpecialFormSlicer, QuoteCode, MustBeString
-from ..ImportHandlerSystem.LibraryClasses import CompileStatus
+from ..ImportHandlerSystem.CompileStatus import CompileStatus
 
 
 def handleSpecialFormImport(currentFrame: StackFrame):
