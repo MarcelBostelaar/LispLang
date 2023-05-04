@@ -4,7 +4,7 @@ from Config.standardLibraryBuilder import outerDefaultRuntimeFrame
 from Evaluator.Classes import RuntimeEvaluationError
 from Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.SupportFunctions import toAST
-from main import tokenizeParse
+from LispLangInterpreter.Evaluator.runFile import tokenizeParse
 
 
 def uncompiledRuntimeTest(catchErrors, inputfile, expectedfile, testName):

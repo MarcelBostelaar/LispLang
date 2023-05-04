@@ -1,36 +1,11 @@
-import LispLangInterpreter.Evaluator.SupportFunctions
+from LispLangInterpreter.Evaluator.runFile import getConfig, tokenizeParse, start
 from LispLangInterpreter.ImportHandlerSystem.Handler import SystemHandlerImporter
 from LispLangInterpreter.ImportHandlerSystem.PackageResolver import mapLibrary, makeAbs
-from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import exampleConfig, libraryFallbackWord
-from LispLangInterpreter.DataStructures.Classes import StackFrame, StackReturnValue
+from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import libraryFallbackWord
+from LispLangInterpreter.DataStructures.Classes import StackFrame
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
-from LispLangInterpreter.Parser.ParserCode import parseAll
-from LispLangInterpreter.Parser.ParserCombinator import SOF_value, EOF_value
 from LispLangInterpreter.Evaluator.SupportFunctions import toAST
-import os.path
-import json
-
-
-configPath = "config.json"
-
-
-def tokenizeParse(text):
-    return parseAll.parse([SOF_value] + list(text) + [EOF_value])
-
-
-def getConfig():
-    if not os.path.isfile(configPath):
-        config = exampleConfig
-        frozen = json.dumps(exampleConfig, indent=4)
-        f = open(configPath, encoding="utf8", mode="w")
-        f.write(frozen)
-        f.close()
-        raise Exception("Config wasn't found, fill config first")
-
-    f = open(configPath, encoding="utf8")
-    x = f.read()
-    return json.loads(x)
 
 
 def main(*argv):
@@ -86,8 +61,9 @@ def main(*argv):
 
 
 if __name__ == '__main__':
-    main("", "eval", "testcode.lisp")
+    # main("", "eval", "testcode.lisp")
     #main(*sys.argv)
+    start()
     pass
 
 

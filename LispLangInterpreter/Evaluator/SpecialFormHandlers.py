@@ -1,4 +1,3 @@
-from .runFile import runFile
 from ..Config.langConfig import SpecialForms
 from ..DataStructures.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandleReturnValue, HandleBranchPoint, UserHandlerFrame
 from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
@@ -18,14 +17,10 @@ def handleSpecialFormImport(currentFrame: StackFrame):
     targetFile = currentFrame.currentScope.currentFile.getSearchable(pathItems)
     if targetFile is None:
         currentFrame.throwError("Could not find " + ".".join(pathItems))
-    if targetFile.compileStatus == CompileStatus.Compiling:
-        currentFrame.throwError("Circular file dependency detected when trying to retrieve " + ".".join(pathItems))
-    elif targetFile.compileStatus == CompileStatus.Uncompiled:
-        targetFile.compileStatus = CompileStatus.Compiling
-        runFile(targetFile)
-        targetFile.compileStatus = CompileStatus.Compiled
 
-    #already compiled or compilation just took place, try to retrieve value
+    if targetFile.compileStatus != CompileStatus.Compiled:
+        targetFile.execute(currentFrame)
+
     value = targetFile.getValue(pathItems[-1])
     if value is None:
         currentFrame.throwError(f"Could not find value {pathItems[-1]} in {'.'.join(pathItems)}")
@@ -203,3 +198,4 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
         return handleSpecialFormImport(currentFrame)
 
     currentFrame.throwError("Unknown special form (engine bug)")
+

@@ -1,7 +1,7 @@
 from termcolor import cprint
 
 from Parser.ParserCombinator import ParseError
-from main import tokenizeParse
+from LispLangInterpreter.Evaluator.runFile import tokenizeParse
 
 
 def parseTest(inputfile, outputExpected, testName):

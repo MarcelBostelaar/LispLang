@@ -24,6 +24,7 @@
         }
     ],
     "sourceFolder": "src",
+    "mainFile" : "testcode",
     "libraryFallback": {
         "path": "Libraries"
     }

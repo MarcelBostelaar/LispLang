@@ -53,8 +53,8 @@ def isLispFile(path: str) -> bool:
 
 def genericMapLispFolder(folder: str) -> [Searchable]:
     files = getFilesIn(folder)
-    pythonFiles: List[Searchable] = [Leaf(basename(x), False) for x in files if isPythonFile(x)]
-    lispFiles = [Leaf(basename(x), True) for x in files if isLispFile(x)]
+    pythonFiles: List[Searchable] = [Leaf(x, False) for x in files if isPythonFile(x)]
+    lispFiles = [Leaf(x, True) for x in files if isLispFile(x)]
 
     folders = getFoldersIn(folder)
     regularFolders = [x for x in folders if not isLispPackage(x) and not isPythonPackage(x)]
@@ -82,9 +82,8 @@ def mapPythonPackage(folder: str) -> PythonPackage:
 
 
 def mapLispPackage(folder: str) -> LispPackage:
-    name = basename(folder)
     children = genericMapLispFolder(folder)
-    return LispPackage(name, children).fixChildren()
+    return LispPackage(folder, children).fixChildren()
 
 
 def makeAbs(path):

@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import importlib
 import os
 from enum import Enum
+from os.path import basename
 from typing import List
+
+from LispLangInterpreter.Config.Singletons import MacroHandlerFrame, RuntimeHandlerFrame
+from LispLangInterpreter.DataStructures.Classes import StackFrame
+from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
+from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
+from LispLangInterpreter.Evaluator.SupportFunctions import toAST
+from LispLangInterpreter.Parser.ParserCode import parseAll
+from LispLangInterpreter.Parser.ParserCombinator import SOF_value, EOF_value
 
 
 class CompileStatus(Enum):
@@ -12,31 +22,22 @@ class CompileStatus(Enum):
 
 
 class Searchable:
-    def __init__(self, name, compileStatus: CompileStatus):
-        self.name = name
+    def __init__(self, absPath, compileStatus: CompileStatus):
+        self.absPath = absPath
+        self.name = None if absPath is None else basename(absPath).split(".")[0]
         self.parent = None
         self.compileStatus: CompileStatus = compileStatus
         self.values = {}
 
-    def getByPath(self, pathElements: [str]) -> Searchable:
-        """Retrieves the specified subelements of this searchable"""
-        raise NotImplementedError("Abstract")
-
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        """Retrieves a specified item using the containing package of this searchable as a base,
-        going up levels as per the convention.
-        """
-        raise NotImplementedError("Abstract")
-
-    def getSearchable(self, pathElement: [str]) -> Searchable:
+    def getSearchable(self, pathElements: [str]) -> Searchable | None:
         """
         Gets the specified searchable where the specified value is located, or None if not found
-        :param pathElement: List of elements
+        :param pathElements: List of elements
         :return: Searchable or None
         """
         raise NotImplementedError("Abstract")
 
-    def getValue(self, name: str) -> Searchable:
+    def getValue(self, name: str) -> Searchable | None:
         """
         Attempts to get a value from the given searchable
         :param name: Name of the item to import
@@ -44,87 +45,84 @@ class Searchable:
         """
         raise NotImplementedError("Abstract")
 
+    def execute(self, callingStack: StackFrame):
+        raise NotImplementedError("Abstract")
+
 
 class Leaf(Searchable):
-    def __init__(self, name, isLisp):
-        super().__init__(name,
-                         CompileStatus.Uncompiled if isLisp else CompileStatus.Compiled)  # python files are compiled by default
+    def __init__(self, absPath, isLisp):
+        super().__init__(absPath,CompileStatus.Uncompiled)
         self.isLisp = isLisp
+        self.data = None
 
-    def getByPath(self, pathElements: [str]) -> Searchable:
-        if len(pathElements) != 0:
-            raise Exception(
-                f"Tried to retrieve for {'.'.join(pathElements)} in {self.name} but {self.name} is a {'lisp' if self.isLisp else 'python'} file."
-                f"Possible naming conflict.")
-        return self
+    def getSearchable(self, pathElements: [str]) -> Searchable | None:
+        return self #if it reaches here, its already correctly found
 
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        return self.parent.getInverseRecursively(pathElements)
+    def getValue(self, name: str) -> Searchable | None:
+        #if python, check if its loaded
+        raise NotImplementedError()
+        pass
+
+    def execute(self, callingStack: StackFrame):
+        if self.compileStatus == CompileStatus.Compiled:
+            raise Exception("Called execute on already compiled file, engine error")
+        elif self.compileStatus == CompileStatus.Compiling:
+            callingStack.throwError("Tried to compile " + self.absPath + " while already compiling, circular dependency")
+        else:
+            self.compileStatus = CompileStatus.Compiling
+            if self.isLisp:
+                text = open(self.absPath, "r").read()
+                parsed = parseAll.parse([SOF_value] + list(text) + [EOF_value])
+                ast = toAST(parsed.content)
+                demacroedCode = DemacroTop(StackFrame(ast, self).withHandlerFrame(MacroHandlerFrame))
+                self.data = Eval(StackFrame(demacroedCode, self).withHandlerFrame(RuntimeHandlerFrame))
+            else:
+                importedModule = importlib.import_module(self.absPath)
+                self.data = importedModule
+            self.compileStatus = CompileStatus.Compiled
+
 
 
 class Container(Searchable):
-    def __init__(self, name, children: List[Searchable]):
-        super().__init__(name, CompileStatus.Uncompiled)  # TODO FIX
+    def __init__(self, absPath, children: List[Searchable]):
+        super().__init__(absPath, CompileStatus.Uncompiled)
         self.children = {x.name: x for x in children}
-
-    def getByPath(self, pathElements: [str]):
-        if len(pathElements) == 0:
-            return self
-        if pathElements[0] in self.children.keys():
-            return self.children[pathElements[0]].getByPath(pathElements[1:])
-        raise Exception(f"Tried to retrieve for {'.'.join(pathElements)} in {self.name} but {self.name} was not found."
-                        f"Possible naming conflict.")
 
     def fixChildren(self):
         for i in self.children.values():
             i.parent = self
         return self
 
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        raise NotImplementedError("Abstract")
+    def getSearchable(self, pathElements: [str]) -> Searchable | None:
+        if len(pathElements) == 0:
+            return None
+        print(self.children.keys())
+        if pathElements[0] in self.children.keys():
+            return self.children[pathElements[0]]
+        return None
 
 
 class Folder(Container):
-    def __init__(self, name, children):
-        super().__init__(name, children)
-
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        return self.parent.getInverseRecursively(pathElements)
+    def __init__(self, absPath, children):
+        super().__init__(absPath, children)
 
 
 class LispPackage(Container):
-    def __init__(self, name, children):
-        super().__init__(name, children)
-
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        if pathElements[0] in self.children.keys():
-            return self.children[pathElements[0]].getByPath(pathElements[1:])
-        return self.parent.getInverseRecursively(pathElements)
+    def __init__(self, absPath, children):
+        super().__init__(absPath, children)
 
 
 class PythonPackage(Container):
-    def __init__(self, name, children):
-        super().__init__(name, children)
+    def __init__(self, absPath, children):
+        super().__init__(absPath, children)
         self.isCompiled = True
-
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        return self.parent.getInverseRecursively(pathElements)
 
 
 class Library(Container):
     def __init__(self, children: List[Searchable], libraryRoot):
         super().__init__(None, children)
-        self.libraryRoot = splitPathFully(libraryRoot)
 
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        if self.parent is None:
-            return self.getByPath(pathElements)
-        else:
-            if pathElements[0] in self.children.keys():
-                return self.getByPath(pathElements)
-            return self.parent.getInverseRecursively(pathElements)
-
-    def getSearchableByPath(self, pathToFind):
+    def getSearchableByPath(self, pathToFind): #TODO deprecated
         """
         Returns the searchable from the library corresponding to a given path
         :param pathToFind: The absolute path to a file, package or folder.
@@ -145,7 +143,7 @@ class Library(Container):
 
 class LibraryWithFallback(Searchable):
     def __init__(self, primary: Library, fallback: Library | LibraryWithFallback):
-        super().__init__(None,
+        super().__init__(None, #virtual folder
                          CompileStatus.Compiled
                          if primary.compileStatus == fallback.compileStatus == CompileStatus.Compiled
                          else CompileStatus.Uncompiled)
@@ -153,13 +151,14 @@ class LibraryWithFallback(Searchable):
         primary.parent = self
         self.fallback = fallback
 
-    def getByPath(self, pathElements: [str]) -> Searchable:
-        if pathElements[0] in self.primary.children.keys():
-            return self.primary.getByPath(pathElements)
-        return self.fallback.getByPath(pathElements)
-
-    def getInverseRecursively(self, pathElements: [str]) -> Searchable:
-        return self.getByPath(pathElements)
+    def getSearchable(self, pathElements: [str]) -> Searchable | None:
+        if len(pathElements) == 0:
+            return None
+        primaryResult = self.primary.getSearchable(pathElements)
+        if primaryResult is None:
+            return self.fallback.getSearchable(pathElements)
+        else:
+            return primaryResult
 
 
 def splitPathFully(path):

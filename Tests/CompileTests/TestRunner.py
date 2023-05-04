@@ -3,7 +3,7 @@ from termcolor import cprint
 from LispLangInterpreter.Config.standardLibraryBuilder import outerDefaultRuntimeFrame
 from LispLangInterpreter.Evaluator.Classes import RuntimeEvaluationError
 from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
-from main import tokenizeParse
+from LispLangInterpreter.Evaluator.runFile import tokenizeParse
 
 
 def compileTest(catchErrors, inputfile, expectedfile, testName):
