@@ -23,7 +23,8 @@ class Searchable:
         self.compileStatus: CompileStatus = compileStatus
         self.values = {}
 
-    def getSearchable(self, pathElements: [str]) -> Searchable | None:
+    def getSearchable(self, pathElements: [str]) -> Searchable | None: #TODO split searchable into start point finder and depth finder
+        # again to prevent constant back and forth search
         """
         Gets the specified searchable where the specified value is located, or None if not found
         :param pathElements: List of elements
@@ -50,7 +51,12 @@ class Leaf(Searchable):
         self.data = None
 
     def getSearchable(self, pathElements: [str]) -> Searchable | None:
-        return self #if it reaches here, its already correctly found
+        if pathElements[0] == self.name:
+            if len(pathElements) == 2:
+                return self
+            return None #Possible naming conflict, same file, but not looking for value in this file
+        self.parent.getSearchable(pathElements)
+
 
     def getValue(self, name: str) -> Searchable | None:
         #if python, check if its loaded
@@ -90,7 +96,6 @@ class Container(Searchable):
     def getSearchable(self, pathElements: [str]) -> Searchable | None:
         if len(pathElements) == 0:
             return None
-        print(self.children.keys())
         if pathElements[0] in self.children.keys():
             return self.children[pathElements[0]]
         return None

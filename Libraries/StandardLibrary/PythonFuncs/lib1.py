@@ -1,9 +1,11 @@
 import string
 import uuid
 
+import LispLangInterpreter.DataStructures.Kind
 from LispLangInterpreter.Evaluator.SupportFunctions import MustBeKind
-from LispLangInterpreter.DataStructures.Classes import List, Kind, SystemFunction, Boolean, StackFrame, Number, ContinueStop, \
+from LispLangInterpreter.DataStructures.Classes import List, SystemFunction, Boolean, StackFrame, Number, ContinueStop, \
     UnfinishedHandlerInvocation, Unit, QuotedName
+from LispLangInterpreter.DataStructures.Kind import Kind
 
 
 def headf(somelist: List, callingFrame: StackFrame):
@@ -60,7 +62,7 @@ def isStringf(value):
     if value.kind is not Kind.List:
         return False
     for i in value.value:
-        if i.Kind is not Kind.Char:
+        if LispLangInterpreter.DataStructures.Kind.Kind is not Kind.Char:
             return False
     return True
 isString = SystemFunction(isStringf, 1)

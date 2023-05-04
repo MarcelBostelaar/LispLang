@@ -6,30 +6,13 @@ from typing import TYPE_CHECKING
 
 from termcolor import cprint
 
+from .Kind import Kind
 from ..Config import langConfig
 from .HandlerStateRegistry import HandlerStateSingleton
 from .SupportFunctions import escape_string, checkReservedKeyword, isIndirectionValue, \
     dereference
 if TYPE_CHECKING:
     from ..ImportHandlerSystem.LibraryClasses import Searchable
-
-
-class Kind(Enum):
-    Lambda = 1
-    Reference = 2
-    QuotedName = 3
-    List = 4
-    sExpression = 5
-    Char = 6
-    Number = 7
-    Boolean = 8
-    Scope = 9
-    StackReturnValue = 10
-    ContinueStop = 11
-    HandleReturnValue = 12
-    HandlerFrame = 13
-    HandleBranchPoint = 14
-    Unit = 15
 
 
 class Value:
@@ -496,7 +479,7 @@ class Scope(Value):
         return copy
 
     def __copy__(self) -> Scope:
-        copy = Scope()
+        copy = Scope(self.currentFile)
         copy.__scopedNames__ = self.__scopedNames__
         copy.__scopedValues__ = self.__scopedValues__
         return copy
@@ -683,7 +666,7 @@ class StackFrame:
             self.throwError("Tried to evaluate a subitem of a value that isnt an s expression. Engine error.")
         if itemIndex >= len(self.executionState.value):
             self.throwError("Tried to evaluate a subitem that is out of range. Engine error.")
-        item = self.executionState[itemIndex]
+        item = self.executionState.value[itemIndex]
         return item.kind is not Kind.sExpression and not isIndirectionValue(item)
 
     def SubEvaluate(self, itemIndex) -> StackFrame:

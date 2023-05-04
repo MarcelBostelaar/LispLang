@@ -1,5 +1,6 @@
 from ..Config.langConfig import SpecialForms
-from ..DataStructures.Classes import Kind, sExpression, Reference, StackFrame, Value, List, QuotedName
+from ..DataStructures.Classes import sExpression, Reference, StackFrame, Value, List, QuotedName
+from ..DataStructures.Kind import Kind
 
 
 def toAST(LLQ):

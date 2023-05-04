@@ -1,5 +1,6 @@
-from ..DataStructures.Classes import sExpression, Kind, StackFrame, Value, \
+from ..DataStructures.Classes import sExpression, StackFrame, Value, \
     StackReturnValue, Lambda, HandleBranchPoint, ContinueStop
+from ..DataStructures.Kind import Kind
 from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
 from .SpecialFormHandlers import ExecuteSpecialForm
 from ..DataStructures.SupportFunctions import isIndirectionValue, dereference, isSpecialFormKeyword

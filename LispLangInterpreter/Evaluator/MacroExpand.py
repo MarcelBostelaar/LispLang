@@ -1,4 +1,5 @@
-from ..DataStructures.Classes import Kind, Lambda, List, UserLambda, StackFrame, sExpression, Value, Reference
+from ..DataStructures.Classes import Lambda, List, UserLambda, StackFrame, sExpression, Value, Reference
+from ..DataStructures.Kind import Kind
 from ..Config.langConfig import SpecialForms
 from ..Evaluator.EvaluatorCode import Eval
 from .SupportFunctions import toAST, MustBeKind, SpecialFormSlicer

@@ -1,19 +1,44 @@
 from ..Config.langConfig import SpecialForms
-from ..DataStructures.Classes import StackFrame, Kind, sExpression, StackReturnValue, UserLambda, List, HandleReturnValue, HandleBranchPoint, UserHandlerFrame
+from ..DataStructures.Classes import StackFrame, sExpression, StackReturnValue, UserLambda, List, HandleReturnValue, HandleBranchPoint, UserHandlerFrame
+from ..DataStructures.Kind import Kind
 from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
 from ..DataStructures.SupportFunctions import isIndirectionValue, dereference
 from .SupportFunctions import MustBeKind, SpecialFormSlicer, QuoteCode, MustBeString
 from ..ImportHandlerSystem.CompileStatus import CompileStatus
 
 
+def fixImportNames(what, currentFrame: StackFrame):
+    """
+    Fixes up the names to be imported. Due to bad design in evaluator, all code is turned into s expressions.
+    This led to needing to parse a string as a '[list '[char char char]] item which turns into '[char char char] after turning it executable.
+    We need a list of strings. This function fixes this compounded mistake.
+    In version 2 evaluation will be done differently.
+    :param what:
+    :return:
+    """
+    error = "Import names must be given in the form of a scoped s expression of strings"
+    MustBeKind(currentFrame, what, error, Kind.sExpression)
+    names = []
+    for i in what.value:
+        MustBeKind(currentFrame, i, error, Kind.sExpression)
+        if len(i.value) != 2:
+            currentFrame.throwError(error)
+        if i.value[0].value != "list":
+            currentFrame.throwError(error)
+        MustBeKind(currentFrame, i.value[1], error, Kind.sExpression)
+        for j in i.value[1].value:
+            MustBeKind(currentFrame, j, error, Kind.Char)
+        joinedName = "".join([x.value for x in i.value[1].value])
+        names += [joinedName]
+
+    return names
+
+
 def handleSpecialFormImport(currentFrame: StackFrame):
     [[_, what, saveAs], tail] = \
         SpecialFormSlicer(currentFrame, SpecialForms.import__)
-    MustBeKind(currentFrame, what, "Import must be an unquoted list of strings", Kind.sExpression)
     MustBeKind(currentFrame, saveAs, "Target name must be a reference", Kind.Reference)
-    for i in what.value:
-        MustBeString(currentFrame, i, "The value for a path must be a string")
-    pathItems = ["".join(x) for x in what.value.value]
+    pathItems = fixImportNames(what, currentFrame)
     targetFile = currentFrame.currentScope.currentFile.getSearchable(pathItems)
     if targetFile is None:
         currentFrame.throwError("Could not find " + ".".join(pathItems))

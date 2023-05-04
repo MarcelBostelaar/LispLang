@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .Classes import *
+from .Kind import Kind
 from ..Config import langConfig
 from ..Config.langConfig import SpecialForms
 
