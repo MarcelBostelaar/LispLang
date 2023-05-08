@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from LispLangInterpreter.Config.Singletons import writeLineLog
+
 
 class parseResult:
     def __init__(self, isSucces, content, remaining, errors):
@@ -27,30 +29,32 @@ class Combinator:
         self.debugMessage = debugMessage
 
     def parse(self, tokens):
-        if self.debugMessage is None:
+        if self.debugMessage is None and False: #TODO REMOVE and FALSE
             return self.f(tokens)
         else:
             try:
                 breakpoint = 10
                 result = self.f(tokens)
-                print(self.debugMessage)
-                if result.isSucces:
-                    print("Success, parsed:")
-                    print(result.content)
-                    if len(result.errors) > 0:
-                        print("Errors:")
-                        print("\n".join([x.message for x in result.errors]))
-                    print("Remainder:")
-                    print(result.remaining)
-                    print("")
+                writeLineLog(self.debugMessage)
+                if result.isSucces or True: #TODO REMOVE OR TRUE
+                    if result.content is not None:
+                        if str(result.content) != "[]":
+                            writeLineLog("Success, parsed:")
+                            writeLineLog(str(result.content))#TODO REVERT LOGGING
+                            if len(result.errors) > 0:
+                                writeLineLog("Errors:")
+                                writeLineLog("\n".join([x.message for x in result.errors]))
+                            writeLineLog("Remainder:")
+                            writeLineLog(str(result.remaining))
+                            writeLineLog("")
                 else:
-                    print("failed, input:")
-                    print(tokens)
-                    print("")
+                    writeLineLog("failed, input:")
+                    writeLineLog(tokens)
+                    writeLineLog("")
                 return result
             except Exception as e:
-                print("Exception while parsing")
-                print(self.debugMessage)
+                writeLineLog("Exception while parsing")
+                writeLineLog(self.debugMessage)
                 raise e
 
     def addDebugMessage(self, message) -> Combinator:

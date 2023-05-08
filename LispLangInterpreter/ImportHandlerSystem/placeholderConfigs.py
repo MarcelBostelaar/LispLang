@@ -20,14 +20,13 @@ handleExample = [
 ]
 
 libraryFallbackWord = "libraryFallback"
-sourceFolderWord = "sourceFolder"
 
 exampleConfig = {
     "enableImports": True,
     "enableExceptions": True,
     "handledRuntimeEffects": handleExample,
     "handledMacroEffects": handleExample,
-    sourceFolderWord: "src",
+    "path": "src",
     "mainFile": "main.lisp",
     libraryFallbackWord: {
         "path": "Libraries",

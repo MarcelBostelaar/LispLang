@@ -23,7 +23,7 @@
             ]
         }
     ],
-    "sourceFolder": "src",
+    "path": "src",
     "mainFile" : "testcode",
     "libraryFallback": {
         "path": "Libraries"

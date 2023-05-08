@@ -14,18 +14,16 @@ def handleSpecialFormImport(currentFrame: StackFrame):
         return currentFrame.SubEvaluate(1)
     if not currentFrame.isFullyEvaluated(2):
         return currentFrame.SubEvaluate(2)
-    MustBeKind(currentFrame, saveAs, "Target name must be a reference", Kind.Reference)
-    pathItems = ["".join(x) for x in [y.value for y in what.value]]
-    targetFile = currentFrame.currentScope.currentFile.getSearchable(pathItems)
-    if targetFile is None:
-        currentFrame.throwError("Could not find " + ".".join(pathItems))
+    MustBeKind(currentFrame, saveAs, "Target name must be a reference", Kind.QuotedName)
+    error = "Import target must be a list of strings"
+    MustBeKind(currentFrame, what, error, Kind.List)
+    for i in what.value:
+        MustBeString(currentFrame, i, error)
+    pathItems = ["".join([z.value for z in x.value]) for x in what.value]
 
-    if targetFile.compileStatus != CompileStatus.Compiled:
-        targetFile.execute(currentFrame)
-
-    value = targetFile.getValue(pathItems[-1])
+    value = currentFrame.currentScope.currentFile.find(currentFrame, pathItems)
     if value is None:
-        currentFrame.throwError(f"Could not find value {pathItems[-1]} in {'.'.join(pathItems)}")
+        currentFrame.throwError("Could not find " + ".".join(pathItems))
     return currentFrame.withExecutionState(tail).addScopedRegularValue(saveAs.value, value)
 
 

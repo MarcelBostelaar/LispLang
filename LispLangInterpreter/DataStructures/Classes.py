@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from termcolor import cprint
 
+from .IErrorThrowable import IErrorThrowable
 from .Kind import Kind
 from ..Config import langConfig
 from .HandlerStateRegistry import HandlerStateSingleton
@@ -619,7 +620,7 @@ class StackReturnValue(Value):
         return "StackReturnValue"
 
 
-class StackFrame:
+class StackFrame(IErrorThrowable):
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
 
     def __init__(self, executionState, currentFile: Searchable):

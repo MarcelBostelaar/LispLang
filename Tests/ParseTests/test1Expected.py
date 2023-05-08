@@ -1,4 +1,4 @@
-from Evaluator.Classes import *
+from LispLangInterpreter.DataStructures.Classes import *
 
 
 def q(x):

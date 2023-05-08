@@ -23,7 +23,8 @@ endComment = endCommentStart \
     .then(linebreaks.mustFailThenTry(Any).many(0)) \
     .then(linebreaks)
 
-ignore = whitespace.OR(inlineComment).OR(endComment).many(0).ignore()
+endCommentEOF = endCommentStart.then(EOF.mustFailThenTry(Any).many(0)).then(EOF).mapResult(lambda _: [EOF])
+ignore = (whitespace.OR(inlineComment).OR(endComment).many(0).ignore()).then(endCommentEOF.many(0))
 
 
 def escapedChar(char, becomes):
@@ -108,6 +109,5 @@ def BracketedContent():
         .mapResult(lambda x: x[1:-1]) \
         .mapResult(List) \
         .mapResult(lambda x: [x])
-
 
 parseAll = SOF.then(ProgramContent()).then(EOF).mapResult(lambda x: List(x[1:-1]))

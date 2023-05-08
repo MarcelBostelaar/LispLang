@@ -1,7 +1,11 @@
 from termcolor import cprint
 
-from Parser.ParserCombinator import ParseError
-from LispLangInterpreter.Evaluator.runFile import tokenizeParse
+from LispLangInterpreter.Parser.ParserCode import parseAll
+from LispLangInterpreter.Parser.ParserCombinator import ParseError, SOF_value, EOF_value
+
+
+def tokenizeParse(inp):
+    return parseAll.parse([SOF_value] + list(inp) + [EOF_value])
 
 
 def parseTest(inputfile, outputExpected, testName):

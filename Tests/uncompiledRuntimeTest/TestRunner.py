@@ -1,10 +1,9 @@
 from termcolor import cprint
 
-from Config.standardLibraryBuilder import outerDefaultRuntimeFrame
-from Evaluator.Classes import RuntimeEvaluationError
-from Evaluator.EvaluatorCode import Eval
+from LispLangInterpreter.DataStructures.Classes import RuntimeEvaluationError, StackFrame
+from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.SupportFunctions import toAST
-from LispLangInterpreter.Evaluator.runFile import tokenizeParse
+from Tests.ParseTests.TestRunner import tokenizeParse
 
 
 def uncompiledRuntimeTest(catchErrors, inputfile, expectedfile, testName):
@@ -44,7 +43,7 @@ def runtimeTestInternal(inputfile, expectedfile, testName):
         return
 
 
-    ranCode = Eval(outerDefaultRuntimeFrame.createChild(toAST(parsedinp.content)))
+    ranCode = Eval(StackFrame().createChild(toAST(parsedinp.content)))
     evaluatedExpected = Eval(outerDefaultRuntimeFrame.createChild(toAST(parsedexp.content)))
 
     realSer = ranCode.serializeLLQ()

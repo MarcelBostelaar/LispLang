@@ -90,17 +90,16 @@ def makeAbs(path):
     return os.path.join(os.path.abspath(os.getcwd()), path)
 
 
-def mapLibrary(primaryAbsPath: str, libraryConfig) -> Library | LibraryWithFallback:
+def mapLibrary(libraryConfig) -> Library | LibraryWithFallback:
     if "path" in libraryConfig.keys():
-        fallbackPath = makeAbs(libraryConfig["path"])
+        primaryPath = makeAbs(libraryConfig["path"])
     elif "abspath" in libraryConfig.keys():
-        fallbackPath = libraryConfig["abspath"]
+        primaryPath = libraryConfig["abspath"]
     else:
-        raise Exception("Path for fallback library not found")
-
-    primary = Library(genericMapLispFolder(primaryAbsPath), primaryAbsPath).fixChildren()
+        raise Exception("No primary folder found")
+    mappedChildren = genericMapLispFolder(primaryPath)
     if libraryFallbackWord not in libraryConfig.keys():
-        fallback = Library(genericMapLispFolder(fallbackPath), fallbackPath).fixChildren()
+        return Library(primaryPath, mappedChildren).fixChildren()
     else:
-        fallback = mapLibrary(fallbackPath, libraryConfig[libraryFallbackWord])
-    return LibraryWithFallback(primary, fallback)
+        fallback = mapLibrary(libraryConfig[libraryFallbackWord])
+        return LibraryWithFallback(primaryPath, mappedChildren, fallback)
