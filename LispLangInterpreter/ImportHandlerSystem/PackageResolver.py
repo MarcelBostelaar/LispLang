@@ -71,14 +71,14 @@ def genericMapLispFolder(folder: str) -> [Searchable]:
 def mapRegularFolder(folder: str) -> Folder:
     name = basename(folder)
     children = genericMapLispFolder(folder)
-    self = Folder(name, children).fixChildren()
+    self = Folder(folder, children).fixChildren()
     return self
 
 
 def mapPythonPackage(folder: str) -> PythonPackage:
     subPackages: List[Searchable] = [mapPythonPackage(x) for x in getFoldersIn(folder) if isPythonPackage(x)]
-    files = [Leaf(basename(x), False) for x in getFilesIn(folder) if isPythonFile(x)]
-    return PythonPackage(basename(folder), subPackages + files).fixChildren()
+    files = [Leaf(x, False) for x in getFilesIn(folder) if isPythonFile(x)]
+    return PythonPackage(folder, subPackages + files).fixChildren()
 
 
 def mapLispPackage(folder: str) -> LispPackage:

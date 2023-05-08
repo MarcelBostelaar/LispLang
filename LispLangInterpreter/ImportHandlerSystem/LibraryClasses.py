@@ -25,7 +25,7 @@ class Searchable:
         self.compileStatus: CompileStatus = CompileStatus.Uncompiled
         self.values = {}
 
-    def _findStart(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
+    def _findStart(self, callingStack: IErrorThrowable, startName: str) -> Searchable | None:
         raise NotImplementedError("Abstract")
 
     def _findInside(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
@@ -40,7 +40,7 @@ class Searchable:
         :param pathElements: List of elements
         :return: Searchable or None
         """
-        start = self._findStart(callingStack, pathElements)
+        start = self._findStart(callingStack, pathElements[0])
         if start is None:
             return None
         return start._findInside(callingStack, pathElements[1:])
@@ -63,17 +63,17 @@ class Leaf(Searchable):
         self.isLisp = isLisp
         self.data = None
 
-    def _findStart(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
-        if self.name == pathElements[0]:
+    def _findStart(self, callingStack: IErrorThrowable, startName: str) -> Searchable | None:
+        if self.name == startName:
             return self
-        return self.parent._findStart(callingStack, pathElements)
+        return self.parent._findStart(callingStack, startName)
 
     def _findInside(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
         if len(pathElements) == 0:
             return self
         if pathElements[0] == self.name:
             if len(pathElements) == 2:
-                return self._getValue(pathElements[1])
+                return self._getValue(callingStack, pathElements[1])
             return None  # Possible naming conflict, same file, but not looking for value in this file
         return None  # No match
 
@@ -125,15 +125,29 @@ class Container(Searchable):
             i.parent = self
         return self
 
+    def _findStart(self, callingStack: IErrorThrowable, startName: str) -> Searchable | None:
+        if self.name == startName:
+            return self
+        if startName in self.children.keys():
+            return self.children[startName]
+        return self.parent._findStart(callingStack, startName)
+
+    def _getValue(self, callingStack: IErrorThrowable, name: str) -> Value | None:
+        raise NotImplementedError("Abstract")
+
+    def execute(self, callingStack: IErrorThrowable):
+        raise NotImplementedError("Abstract")
+
 
 class Folder(Container):
     def __init__(self, absPath, children):
         super().__init__(absPath, children)
 
-    def _findStart(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
-        if self.name == pathElements[0]:
-            return self
-        return self.parent._findStart(callingStack, pathElements)
+    def _getValue(self, callingStack: IErrorThrowable, name: str) -> Value | None:
+        callingStack.throwError("Cannot retrieve a value from a folder. Value " + name + " in folder " + self.absPath)
+
+    def execute(self, callingStack: IErrorThrowable):
+        callingStack.throwError("Cannot execute a folder. Folder " + self.absPath)
 
 
 class Package(Container):
@@ -168,8 +182,10 @@ class Library(Container):
     def __init__(self, absPath, children: List[Searchable]):
         super().__init__(absPath, children)
 
-    def _findStart(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
-        return self._findInside(callingStack, pathElements)
+    def _findStart(self, callingStack: IErrorThrowable, startName: str) -> Searchable | None:
+        if startName in self.children.keys():
+            return self.children[startName]
+        return None
 
     def _getValue(self, callingStack: IErrorThrowable, name: str) -> Value | None:
         raise Exception("Cannot get value from a general library folder")
@@ -183,8 +199,10 @@ class LibraryWithFallback(Library):
         super().__init__(absPath, children)
         self.fallback = fallback
 
-    def _findStart(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
-        return self._findInside(callingStack, pathElements)
+    def _findStart(self, callingStack: IErrorThrowable, startName: str) -> Searchable | None:
+        superResult = super()._findStart(callingStack, startName)
+        if superResult is None:
+            return self.fallback._findStart(callingStack, startName)
 
     def _findInside(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
         primary = super()._findInside(callingStack, pathElements)
