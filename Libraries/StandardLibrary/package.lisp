@@ -9,3 +9,4 @@ __import [list ["PythonFuncs" "head"]] [quote head]
 //__import PythonFuncs.printFunction
 //__import PythonFuncs.handlerInvocationDefinition
 //__import PythonFuncs.genSym
+list [ [list ["head" head]] ]

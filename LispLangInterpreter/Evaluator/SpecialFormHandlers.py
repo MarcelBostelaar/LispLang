@@ -24,7 +24,7 @@ def handleSpecialFormImport(currentFrame: StackFrame):
     value = currentFrame.currentScope.currentFile.find(currentFrame, pathItems)
     if value is None:
         currentFrame.throwError("Could not find " + ".".join(pathItems))
-    return currentFrame.withExecutionState(tail).addScopedRegularValue(saveAs.value, value)
+    return currentFrame.withExecutionState(sExpression(tail)).addScopedRegularValue(saveAs.value, value)
 
 
 def handleSpecialFormCond(currentFrame: StackFrame):

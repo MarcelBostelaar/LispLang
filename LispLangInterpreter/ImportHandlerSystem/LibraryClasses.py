@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib
 import os
+import random
+import sys
 from os.path import basename
 from typing import List
 
@@ -11,7 +13,7 @@ from LispLangInterpreter.DataStructures.Classes import StackFrame, Value
 from LispLangInterpreter.DataStructures.IErrorThrowable import IErrorThrowable
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
-from LispLangInterpreter.Evaluator.SupportFunctions import toAST
+from LispLangInterpreter.Evaluator.SupportFunctions import toAST, makeDictFromReturn
 from LispLangInterpreter.ImportHandlerSystem.CompileStatus import CompileStatus
 from LispLangInterpreter.Parser.ParserCode import parseAll
 from LispLangInterpreter.Parser.ParserCombinator import SOF_value, EOF_value
@@ -80,10 +82,14 @@ class Leaf(Searchable):
     def _getValue(self, callingStack: IErrorThrowable, name: str) -> Value | None:
         if self.compileStatus != CompileStatus.Compiled:
             self.execute(callingStack)
+            if self.isLisp:
+                self.libraryDict = makeDictFromReturn(callingStack, self.data)
         if self.isLisp:
-            raise NotImplementedError()
+            if name not in self.libraryDict.keys():
+                return None
+            return self.libraryDict[name]
         else:
-            raise NotImplementedError()
+            return getattr(self.data, name, None)
 
     def execute(self, callingStack: IErrorThrowable):
         if self.compileStatus == CompileStatus.Compiled:
@@ -102,8 +108,11 @@ class Leaf(Searchable):
                 demacroedCode = DemacroTop(StackFrame(ast, self).withHandlerFrame(MacroHandlerFrame))
                 self.data = Eval(StackFrame(demacroedCode, self).withHandlerFrame(RuntimeHandlerFrame))
             else:
-                importedModule = importlib.import_module(self.absPath)
-                self.data = importedModule
+                sys.path.append(self.parent.absPath)
+                spec = importlib.util.spec_from_file_location("testname" + str(random.Random().random()), self.absPath)
+                self.data = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(self.data)
+                sys.path.remove(self.parent.absPath)
             self.compileStatus = CompileStatus.Compiled
 
 
@@ -203,6 +212,7 @@ class LibraryWithFallback(Library):
         superResult = super()._findStart(callingStack, startName)
         if superResult is None:
             return self.fallback._findStart(callingStack, startName)
+        return superResult
 
     def _findInside(self, callingStack: IErrorThrowable, pathElements: [str]) -> Searchable | None:
         primary = super()._findInside(callingStack, pathElements)

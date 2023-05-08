@@ -3,6 +3,7 @@ from __future__ import annotations
 from .Classes import *
 from .Kind import Kind
 from ..Config import langConfig
+from ..Config.Singletons import writeLineLog
 from ..Config.langConfig import SpecialForms
 
 
@@ -12,7 +13,7 @@ def checkReservedKeyword(callingFrame: StackFrame, name):
 
 
 def escape_string(string):
-    print("TODO implement string escaping")  # todo
+    writeLineLog("TODO implement string escaping")  # todo
     return string
 
 

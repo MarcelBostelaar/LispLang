@@ -99,8 +99,8 @@ def Eval(currentFrame: StackFrame) -> Value:
     """
     # continue statements used to achieve tail call optimisation, and to keep stack usage to a minimum
     while True:
-        # print("----\n")
-        # currentFrame.__stackTrace__()
+        print("----\n")
+        currentFrame.__stackTrace__()
         if currentFrame.executionState.kind != Kind.sExpression:
             programFinished, returnValue = EvalHandleTopLevelValue(currentFrame)
             if programFinished:
