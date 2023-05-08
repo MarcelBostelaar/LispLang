@@ -20,11 +20,10 @@ inlineComment = inlineStart\
 
 endCommentStart = MS("/").then(MS("/"))
 endComment = endCommentStart \
-    .then(linebreaks.mustFailThenTry(Any).many(0)) \
-    .then(linebreaks)
+    .then((linebreaks.OR(EOF)).mustFailThenTry(Any).many(0))
 
-endCommentEOF = endCommentStart.then(EOF.mustFailThenTry(Any).many(0)).then(EOF).mapResult(lambda _: [EOF])
-ignore = (whitespace.OR(inlineComment).OR(endComment).many(0).ignore()).then(endCommentEOF.many(0))
+
+ignore = (whitespace.OR(inlineComment).OR(endComment).many(0).ignore())
 
 
 def escapedChar(char, becomes):

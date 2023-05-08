@@ -4,10 +4,11 @@ currentFileSystem = None
 MacroHandlerFrame = None
 RuntimeHandlerFrame = None
 
-log = open("log.txt", "w")
 
 consolePrint = False
-textPrint = True
+textPrint = False
+if textPrint:
+    log = open("log.txt", "w")
 
 
 def writeLineLog(obj):
