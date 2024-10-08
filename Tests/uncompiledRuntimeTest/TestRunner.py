@@ -1,20 +1,27 @@
+import os
+
 from termcolor import cprint
 
+from LispLangInterpreter.Config import Singletons
 from LispLangInterpreter.DataStructures.Classes import RuntimeEvaluationError, StackFrame
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.SupportFunctions import toAST
+from LispLangInterpreter.Evaluator.runFile import executeLeaf
+from LispLangInterpreter.ImportHandlerSystem.LibraryClasses import Leaf
 from Tests.ParseTests.TestRunner import tokenizeParse
 
 
-def uncompiledRuntimeTest(catchErrors, inputfile, expectedfile, testName):
+def uncompiledRuntimeTest(catchErrors, config, inputfile, expectedfile, testName):
     if catchErrors:
         try:
+            Singletons.runtimeConfig = config
             runtimeTestInternal(inputfile, expectedfile, testName)
         except:
             cprint("Exception while executing Tests '" + testName + "'", "red")
             print("")
     else:
         try:
+            Singletons.runtimeConfig = config
             runtimeTestInternal(inputfile, expectedfile, testName)
         except RuntimeEvaluationError:
             cprint("Runtime error while executing Tests '" + testName + "'", "red")
@@ -22,29 +29,10 @@ def uncompiledRuntimeTest(catchErrors, inputfile, expectedfile, testName):
 
 
 def runtimeTestInternal(inputfile, expectedfile, testName):
-    f = open(inputfile)
-    inp = f.read()
-    f.close()
-    f = open(expectedfile)
-    exp = f.read()
-    f.close()
-    parsedinp = tokenizeParse(inp)
-    parsedexp = tokenizeParse(exp)
-
-    if len(parsedinp.errors) != 0:
-        cprint(testName + " failed, parsing error in input", "red")
-        for i in parsedinp.errors:
-            cprint(f"{i.message} at {i.lengthRemaining}", "red")
-        return
-    if len(parsedexp.errors) != 0:
-        cprint(testName + " failed, parsing error in expected output", "red")
-        for i in parsedexp.errors:
-            cprint(f"{i.message} at {i.lengthRemaining}", "red")
-        return
-
-
-    ranCode = Eval(StackFrame().createChild(toAST(parsedinp.content)))
-    evaluatedExpected = Eval(outerDefaultRuntimeFrame.createChild(toAST(parsedexp.content)))
+    inputLeaf = Leaf(os.path.abspath(inputfile), True)
+    expectedLeaf = Leaf(os.path.abspath(expectedfile), True)
+    ranCode = executeLeaf(inputLeaf)
+    evaluatedExpected = executeLeaf(expectedLeaf)
 
     realSer = ranCode.serializeLLQ()
     expSer = evaluatedExpected.serializeLLQ()

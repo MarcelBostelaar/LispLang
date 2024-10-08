@@ -9,17 +9,29 @@ from LispLangInterpreter.ImportHandlerSystem.PackageResolver import mapLibrary, 
 from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import libraryFallbackWord, exampleConfig
 
 
-def start():
-    Singletons.runtimeConfig = getConfig()
-    topLevelErrorHandler = ErrorCatcher()
+def reloadConfig():
+    """If is none added to allow mocking during unit tests"""
+    if Singletons.runtimeConfig is None:
+        Singletons.runtimeConfig = getConfig()
 
     Singletons.currentFileSystem = mapLibrary(Singletons.runtimeConfig)
-    startFile = Singletons.currentFileSystem.find(topLevelErrorHandler, [Singletons.runtimeConfig["mainFile"]])
-
     Singletons.MacroHandlerFrame = SystemHandlerImporter(Singletons.runtimeConfig["handledMacroEffects"])
     Singletons.MacroHandlerFrame = SystemHandlerImporter(Singletons.runtimeConfig["handledRuntimeEffects"])
-    startFile.execute(topLevelErrorHandler) #no error would be thrown in this initial state so no stackframe is neccecary
+
+
+def start():
+    reloadConfig()
+    errorHandler = ErrorCatcher()
+    startFile = Singletons.currentFileSystem.find(errorHandler, [Singletons.runtimeConfig["mainFile"]])
+    startFile.execute(errorHandler) #no error would be thrown in this initial state so no stackframe is neccecary
     print(startFile.data.serializeLLQ()) #data is the return value
+
+
+def executeLeaf(leaf):
+    reloadConfig()
+    errorhandler = ErrorCatcher()
+    leaf.execute(errorhandler)  # no error would be thrown in this initial state so no stackframe is neccecary
+    return leaf.data  # data is the return value
 
 
 def getConfig():

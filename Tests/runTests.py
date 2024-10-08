@@ -1,11 +1,13 @@
 from functools import partial
 #
 from LispLangInterpreter.Config import errorMessages
+from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import exampleConfig
 from LispLangInterpreter.Parser.ParserCombinator import ParseError
 # from Tests.CompileTests.TestRunner import compileTest
 from Tests.ParseTests.TestRunner import parseTest, parseErrorTest
 #
 from Tests.ParseTests import test1Expected, EOFCommentExpected
+from Tests.uncompiledRuntimeTest.TestRunner import uncompiledRuntimeTest
 
 # from Tests.uncompiledRuntimeTest.TestRunner import uncompiledRuntimeTest
 #
@@ -21,7 +23,7 @@ parseTest("ParseTests/EOFComment.lisp", EOFCommentExpected.expected, "EOF commen
 parseErrorTest("ParseTests/unclosedStringTest.lisp", ParseError(1, errorMessages.unclosedString), "Unclosed string test")
 parseErrorTest("ParseTests/unmatchedBracketTest.lisp", ParseError(1, errorMessages.unclosedBracket), "Unmatched Bracket Test", "ParseTests/unmatchedBracketTestCorrect.lisp")
 
-# uncompiledRuntimeTest("uncompiledRuntimeTest/sumtest1real.lisp", "uncompiledRuntimeTest/sumtest1expected.lisp", "Sum test 1")
+uncompiledRuntimeTest(False, exampleConfig, "uncompiledRuntimeTest/sumtest1real.lisp", "uncompiledRuntimeTest/sumtest1expected.lisp", "Sum test 1")
 # uncompiledRuntimeTest("uncompiledRuntimeTest/sumtest2real.lisp", "uncompiledRuntimeTest/sumtest2expected.lisp", "Sum test 2")
 # uncompiledRuntimeTest("uncompiledRuntimeTest/listEvaluationReal.lisp", "uncompiledRuntimeTest/listEvaluationExpected.lisp", "List evaluation test")
 # uncompiledRuntimeTest("uncompiledRuntimeTest/handleTest1Real.lisp", "uncompiledRuntimeTest/handleTest1Expected.lisp", "Handle test")
