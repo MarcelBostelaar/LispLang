@@ -91,7 +91,9 @@ class Leaf(Searchable):
         else:
             return getattr(self.data, name, None)
 
+
     def execute(self, callingStack: IErrorThrowable):
+        """Compiles an uncompiled leaf. Throws an error when trying to compile an already compiled file or a circular dependency"""
         if self.compileStatus == CompileStatus.Compiled:
             raise Exception("Called execute on already compiled file, engine error")
         elif self.compileStatus == CompileStatus.Compiling:
