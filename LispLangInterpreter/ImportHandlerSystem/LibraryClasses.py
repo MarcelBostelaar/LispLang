@@ -225,13 +225,13 @@ def splitPathFully(path):
     splitted = []
     head = path
     tail = None
-    while head is not "" and tail is not "":
+    while head != "" and tail != "":
         h, t = os.path.split(head)
         head = h
         tail = t
-        if tail is not "":
+        if tail != "":
             splitted.append(tail)
-    if head is not "":
+    if head != "":
         splitted.append(head)
     splitted.reverse()
     return splitted
