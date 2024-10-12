@@ -6,33 +6,34 @@ from LispLangInterpreter.Config import Singletons
 from LispLangInterpreter.DataStructures.Classes import RuntimeEvaluationError, StackFrame
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
 from LispLangInterpreter.Evaluator.SupportFunctions import toAST
-from LispLangInterpreter.Evaluator.runFile import executeLeaf
+from LispLangInterpreter.Evaluator.runFile import executeLeaf, start
 from LispLangInterpreter.ImportHandlerSystem.LibraryClasses import Leaf
 from Tests.ParseTests.TestRunner import tokenizeParse
 
 
-def uncompiledRuntimeTest(catchErrors, config, inputfile, expectedfile, testName):
+def uncompiledRuntimeTest(catchErrors, config, folder, inputfile, expectedfile, testName):
     if catchErrors:
         try:
-            Singletons.runtimeConfig = config
-            runtimeTestInternal(inputfile, expectedfile, testName)
+            runtimeTestInternal(config, folder, inputfile, expectedfile, testName)
         except:
             cprint("Exception while executing Tests '" + testName + "'", "red")
             print("")
     else:
         try:
-            Singletons.runtimeConfig = config
-            runtimeTestInternal(inputfile, expectedfile, testName)
+            runtimeTestInternal(config, folder, inputfile, expectedfile, testName)
         except RuntimeEvaluationError:
             cprint("Runtime error while executing Tests '" + testName + "'", "red")
             print("")
 
 
-def runtimeTestInternal(inputfile, expectedfile, testName):
-    inputLeaf = Leaf(os.path.abspath(inputfile), True)
-    expectedLeaf = Leaf(os.path.abspath(expectedfile), True)
-    ranCode = executeLeaf(inputLeaf)
-    evaluatedExpected = executeLeaf(expectedLeaf)
+def runtimeTestInternal(config, folder, inputfile, expectedfile, testName):
+    config["path"] = folder
+    config["mainFile"] = inputfile
+    Singletons.runtimeConfig = config
+    ranCode = start()
+    config["mainFile"] = expectedfile
+    Singletons.runtimeConfig = config
+    evaluatedExpected = start()
 
     realSer = ranCode.serializeLLQ()
     expSer = evaluatedExpected.serializeLLQ()

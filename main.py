@@ -64,7 +64,8 @@ def main(*argv):
 if __name__ == '__main__':
     # main("", "eval", "testcode.lisp")
     #main(*sys.argv)
-    start()
+    data = start()
+    print(data.serializeLLQ())
     pass
 
 

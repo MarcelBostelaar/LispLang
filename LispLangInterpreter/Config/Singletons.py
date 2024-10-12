@@ -4,6 +4,7 @@ currentFileSystem = None
 MacroHandlerFrame = None
 RuntimeHandlerFrame = None
 
+debug = False
 
 consolePrint = False
 textPrint = False

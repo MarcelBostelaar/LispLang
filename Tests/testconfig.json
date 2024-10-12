@@ -1,0 +1,31 @@
+{
+    "enableImports": true,
+    "enableExceptions": true,
+    "handledRuntimeEffects": [
+        {
+            "path": "Libraries.Exceptions",
+            "handlers": [
+                {
+                    "nameInFile": "exceptionEndpoint",
+                    "handlesFunction": "throwError"
+                }
+            ]
+        }
+    ],
+    "handledMacroEffects": [
+        {
+            "path": "Libraries.Exceptions",
+            "handlers": [
+                {
+                    "nameInFile": "exceptionEndpoint",
+                    "handlesFunction": "throwError"
+                }
+            ]
+        }
+    ],
+    "path": "Tests",
+    "mainFile" : "dummy",
+    "libraryFallback": {
+        "path": "Libraries"
+    }
+}

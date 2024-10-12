@@ -1,5 +1,8 @@
 from functools import partial
+import json
 import os
+
+from LispLangInterpreter.Evaluator.runFile import getConfig
 print("Current Working Directory:", os.getcwd())
 from LispLangInterpreter.Config import errorMessages
 from LispLangInterpreter.ImportHandlerSystem.placeholderConfigs import exampleConfig
@@ -10,6 +13,8 @@ from Tests.ParseTests.TestRunner import parseTest, parseErrorTest
 from Tests.ParseTests import test1Expected, EOFCommentExpected
 from Tests.uncompiledRuntimeTest.TestRunner import uncompiledRuntimeTest
 import os
+
+testConfig = json.loads(open("Tests/testconfig.json", encoding="utf8").read())
 
 # from Tests.uncompiledRuntimeTest.TestRunner import uncompiledRuntimeTest
 #
@@ -25,10 +30,10 @@ parseTest("Tests/ParseTests/EOFComment.lisp", EOFCommentExpected.expected, "EOF 
 parseErrorTest("Tests/ParseTests/unclosedStringTest.lisp", ParseError(1, errorMessages.unclosedString), "Unclosed string test")
 parseErrorTest("Tests/ParseTests/unmatchedBracketTest.lisp", ParseError(1, errorMessages.unclosedBracket), "Unmatched Bracket Test", "Tests/ParseTests/unmatchedBracketTestCorrect.lisp")
 
-uncompiledRuntimeTest(False, exampleConfig, "Tests/uncompiledRuntimeTest/sumtest1real.lisp", "Tests/uncompiledRuntimeTest/sumtest1expected.lisp", "Sum test 1")
-# uncompiledRuntimeTest("uncompiledRuntimeTest/sumtest2real.lisp", "uncompiledRuntimeTest/sumtest2expected.lisp", "Sum test 2")
-# uncompiledRuntimeTest("uncompiledRuntimeTest/listEvaluationReal.lisp", "uncompiledRuntimeTest/listEvaluationExpected.lisp", "List evaluation test")
-# uncompiledRuntimeTest("uncompiledRuntimeTest/handleTest1Real.lisp", "uncompiledRuntimeTest/handleTest1Expected.lisp", "Handle test")
+uncompiledRuntimeTest(False, testConfig, "Tests/uncompiledRuntimeTest", "sumtest1real", "sumtest1expected", "Sum test 1")
+uncompiledRuntimeTest(False, testConfig, "Tests/uncompiledRuntimeTest", "sumtest2real", "sumtest2expected", "Sum test 2")
+uncompiledRuntimeTest(False, testConfig, "Tests/uncompiledRuntimeTest", "listEvaluationReal", "listEvaluationExpected", "List evaluation test")
+uncompiledRuntimeTest(False, testConfig, "Tests/uncompiledRuntimeTest", "handleTest1Real", "handleTest1Expected", "Handle test")
 #
 # compileTest("CompileTests/macro identity.lisp", "CompileTests/macro identity.lisp", "Macro identity")
 # compileTest("CompileTests/simple macro real.lisp", "CompileTests/simple macro expected.lisp", "Simplest demacro Tests")

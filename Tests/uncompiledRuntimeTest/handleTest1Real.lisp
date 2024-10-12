@@ -1,4 +1,7 @@
-let print [declareEffectfulFunction [quote print] 1]
+__import [list ["StandardLibrary" "handlerInvocationDefinition"]] [quote handlerInvocationDefinition]
+__import [list ["StandardLibrary" "concat"]] [quote concat]
+__import [list ["StandardLibrary" "continue"]] [quote continue]
+let print [handlerInvocationDefinition [quote print] 1]
 
 let somefunction [lambda [x] [
     ignore [print "some string"]

@@ -1,12 +1,18 @@
 __import [list ["PythonFuncs" "head"]] [quote head]
 //__import PythonFuncs.tail
-//__import PythonFuncs.concat
+__import [list ["PythonFuncs" "concat"]] [quote concat]
 //__import PythonFuncs.equals
-//__import PythonFuncs.sum
-//__import PythonFuncs.continue_
+__import [list ["PythonFuncs" "sum"]] [quote sum]
+__import [list ["PythonFuncs" "continue_"]] [quote continue]
 //__import PythonFuncs.stop_
 //__import PythonFuncs.isString
 //__import PythonFuncs.printFunction
-//__import PythonFuncs.handlerInvocationDefinition
+__import [list ["PythonFuncs" "handlerInvocationDefinition"]] [quote handlerInvocationDefinition]
 //__import PythonFuncs.genSym
-list [ [list ["head" head]] ]
+list [ 
+    [list ["head" head]] 
+    [list ["concat" concat]]  
+    [list ["sum" sum]]  
+    [list ["handlerInvocationDefinition" handlerInvocationDefinition]] 
+    [list ["continue" continue]] 
+]

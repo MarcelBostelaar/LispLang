@@ -24,7 +24,7 @@ def start():
     errorHandler = ErrorCatcher()
     startFile = Singletons.currentFileSystem.find(errorHandler, [Singletons.runtimeConfig["mainFile"]])
     startFile.execute(errorHandler) #no error would be thrown in this initial state so no stackframe is neccecary
-    print(startFile.data.serializeLLQ()) #data is the return value
+    return startFile.data #data is the return value
 
 
 def executeLeaf(leaf):
