@@ -93,47 +93,49 @@ def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
     return False, currentFrame.parent.withChildReturnValue(resultValue)
 
 
+def non_looping_eval(currentFrame: StackFrame) -> Value:
+    """
+    Evaluates one step of a piece of interpreter representational code
+    """
+    if Singletons.debug:
+        print("----\n")
+        currentFrame.__stackTrace__()
+    if currentFrame.executionState.kind != Kind.sExpression:
+        program_finished, returnValue = EvalHandleTopLevelValue(currentFrame)
+        return program_finished, returnValue
+
+    if len(currentFrame.executionState.value) == 0:
+        return False, currentFrame.throwError("Cant evaluate an s expression with 0 items in it")
+    if len(currentFrame.executionState.value) == 1:
+        # nested single item, pop s expression
+        return False, currentFrame.withExecutionState(currentFrame.executionState.value[0])
+
+    head = currentFrame.executionState.value[0]
+    tail = currentFrame.executionState.value[1:]
+
+    if head.kind == Kind.Reference:
+        return False, handleReferenceAtHead(currentFrame)
+
+    if head.kind == Kind.sExpression:
+        old = currentFrame.withExecutionState(
+            sExpression([StackReturnValue()] + tail)
+        )
+        return False, old.createChild(head)
+
+    if head.kind == Kind.Lambda:
+        return False, EvalLambda(currentFrame)
+
+    # All other options are wrong
+    currentFrame.throwError("Cant apply arguments to type at head/unhandled head kind")
+
+
 # TODO Add tailcall optimization
 def Eval(currentFrame: StackFrame) -> Value:
     """
     Evaluates a piece of interpreter representational code
     """
     # continue statements used to achieve tail call optimisation, and to keep stack usage to a minimum
-    while True:
-        if Singletons.debug:
-            print("----\n")
-            currentFrame.__stackTrace__()
-        if currentFrame.executionState.kind != Kind.sExpression:
-            programFinished, returnValue = EvalHandleTopLevelValue(currentFrame)
-            if programFinished:
-                return returnValue
-            currentFrame = returnValue
-            continue
-
-        if len(currentFrame.executionState.value) == 0:
-            currentFrame.throwError("Cant evaluate an s expression with 0 items in it")
-        if len(currentFrame.executionState.value) == 1:
-            # nested single item, pop s expression
-            currentFrame = currentFrame.withExecutionState(currentFrame.executionState.value[0])
-            continue
-
-        head = currentFrame.executionState.value[0]
-        tail = currentFrame.executionState.value[1:]
-
-        if head.kind == Kind.Reference:
-            currentFrame = handleReferenceAtHead(currentFrame)
-            continue
-
-        if head.kind == Kind.sExpression:
-            old = currentFrame.withExecutionState(
-                sExpression([StackReturnValue()] + tail)
-            )
-            currentFrame = old.createChild(head)
-            continue
-
-        if head.kind == Kind.Lambda:
-            currentFrame = EvalLambda(currentFrame)
-            continue
-
-        # All other options are wrong
-        currentFrame.throwError("Cant apply arguments to type at head/unhandled head kind")
+    program_finished = False
+    while not program_finished:
+        program_finished, currentFrame = non_looping_eval(currentFrame)
+    return currentFrame

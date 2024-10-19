@@ -1,3 +1,4 @@
+from LispLangInterpreter import Config
 from ..DataStructures.Classes import Lambda, List, UserLambda, StackFrame, sExpression, Value, Reference
 from ..DataStructures.Kind import Kind
 from ..Config.langConfig import SpecialForms

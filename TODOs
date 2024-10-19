@@ -1,1 +1,5 @@
 make sure fallback doesnt take fallbacklibrary as parent
+
+Make a subeval function that takes a custom scope so you can use it in the macros
+
+Macro return value currently gets returned as an s expression or list, needs to be exploded somehow into an ast, however, the dereference function as it is used now assumes a singular return value.

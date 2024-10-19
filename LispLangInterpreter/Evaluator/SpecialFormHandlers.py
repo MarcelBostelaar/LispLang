@@ -169,12 +169,12 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
         return handleSpecialFormLambda(currentFrame)
 
     if name == SpecialForms.macro.value.keyword:
-
-        #TODO implement live macro evaluation
-
-        # ignore for this implementation, interpreter doesn't support eval yet
-        [_, rest] = SpecialFormSlicer(currentFrame, SpecialForms.macro)
-        return currentFrame.withExecutionState(sExpression(rest))
+        #calling scope is the scope the macro is called from, which is needed to subevaluate elements in the macro
+        #As of yet, the calling scope is unable to be used, but it is a good idea to keep it for future use, such as with a "subeval" function that takes a custom scope
+        [[_, macroname, callingScope_alias, input_ast_alias, macroFuncBody], rest] = SpecialFormSlicer(currentFrame, SpecialForms.macro)
+        #current scope is the scope the macro is defined in, only those values are available to the macro
+        macroLambda = UserLambda([callingScope_alias, input_ast_alias], macroFuncBody, currentFrame.currentScope)
+        return currentFrame.addScopedMacroValue(macroname.value, macroLambda).withExecutionState(sExpression(rest))
 
     if name == SpecialForms.let.value.keyword:
         return handleSpecialFormLet(currentFrame)

@@ -19,3 +19,5 @@ class Kind(Enum):
     HandlerFrame = 13
     HandleBranchPoint = 14
     Unit = 15
+    MacroReference = 16
+    MacroReturnValue = 17

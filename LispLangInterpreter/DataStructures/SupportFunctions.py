@@ -12,4 +12,4 @@ def isSpecialFormKeyword(name) -> bool:
 
 
 def isIndirectionValue(someValue: Value):
-    return someValue.kind in [Kind.Reference, Kind.StackReturnValue, Kind.HandleReturnValue]
+    return someValue.kind in [Kind.Reference, Kind.StackReturnValue, Kind.HandleReturnValue, Kind.MacroReference]

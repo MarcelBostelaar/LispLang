@@ -26,6 +26,8 @@ def dereference(currentFrame: StackFrame) -> Value:
     if item.kind == Kind.Reference:
         if currentFrame.hasScopedRegularValue(item.value):
             return currentFrame.retrieveScopedRegularValue(item.value)
+        if currentFrame.hasScopedMacroValue(item.value):
+            return MacroReference(item.value)
         if isSpecialFormKeyword(item.value):
             currentFrame.throwError("Tried to execute special form, but item is a singular reference, "
                                     "not in an s expression or on its own.")
@@ -273,10 +275,23 @@ class Reference(Value):
 
     def equals(self, other):
         # References should be evaluated to their value when passed to a function
-        raise "Cannot call equals on a reference value (running code), engine error"
+        raise "Cannot call equals on a reference value (running code), engine error"  #TODO why?
 
     def errorDumpSerialize(self):
         return "*" + self.value
+
+class MacroReference(Value):
+    """Represents a named reference that needs to be evaluated"""
+
+    def __init__(self, value):
+        super().__init__(value, Kind.MacroReference)
+
+    def equals(self, other):
+        # References should be evaluated to their value when passed to a function
+        raise "Cannot call equals on a reference value (running code), engine error" #TODO why?
+
+    def errorDumpSerialize(self):
+        return "*M*" + self.value
 
 #function representations
 
@@ -318,10 +333,10 @@ class UserLambda(Lambda):
     def __bindIsFinished__(self):
         return self.__bindIndex__ >= len(self.__bindings__)
 
-    def bind(self, variable, callingFrame: StackFrame) -> UserLambda:
+    def bind(self, valueToBind, callingFrame: StackFrame) -> UserLambda:
         if self.__bindIsFinished__():
             callingFrame.throwError("Tried to bind fully bound lambda. Engine error.")
-        bound = self.__boundScope__.addScopedRegularValue(callingFrame, self.__bindings__[self.__bindIndex__], variable)
+        bound = self.__boundScope__.addScopedRegularValue(callingFrame, self.__bindings__[self.__bindIndex__], valueToBind)
         return UserLambda(self.__bindings__, self.__body__, bound, bindIndex=self.__bindIndex__ + 1)
 
     def canRun(self) -> bool:
@@ -647,6 +662,16 @@ class StackReturnValue(Value):
     def errorDumpSerialize(self):
         return "StackReturnValue"
 
+class MacroReturnValue(Value):
+    def __init__(self):
+        super().__init__(None, Kind.MacroReturnValue)
+
+    def equals(self, other):
+        raise "Cannot call equals on a stack return value (running code), engine error"
+
+    def errorDumpSerialize(self):
+        return "StackReturnValue"
+
 
 class StackFrame(IErrorThrowable):
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
@@ -715,6 +740,20 @@ class StackFrame(IErrorThrowable):
             newStack = oldFrame.createChild(item)
             return newStack
 
+        if item.kind == Kind.MacroReference:
+            #subevaluate macro with all the code from itemindex forward
+            #retrieving lambda
+            macroLambda = self.retrieveScopedMacroValue(item.value)
+            #binding current scope and ast available to macro to the body of the macro
+            macroLambda = macroLambda\
+                .bind(self.currentScope, self)\
+                .bind(self.executionState.value[itemIndex + 1:], self)
+            #add macro return value, then append macro lambda as child
+            oldFrame = self.withExecutionState(sExpression(
+                self.executionState.value[:itemIndex] + [MacroReturnValue()]
+            ))
+            return oldFrame.createChild(macroLambda)
+            
         # its indirection
         trueValue = dereference(self.withExecutionState(item))
         return self.withExecutionState(sExpression(
@@ -745,7 +784,7 @@ class StackFrame(IErrorThrowable):
         # Do not check parents, because parent can be a non-captured outer scope
         return self.currentScope.hasScopedMacroValue(name)
 
-    def retrieveScopedMacroValue(self, name):
+    def retrieveScopedMacroValue(self, name) -> UserLambda:
         # Do not check parents, because parent can be a non-captured outer scope
         return self.currentScope.retrieveScopedMacroValue(self, name)
 
