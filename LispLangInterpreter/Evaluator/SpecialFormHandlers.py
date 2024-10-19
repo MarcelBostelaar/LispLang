@@ -169,6 +169,9 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
         return handleSpecialFormLambda(currentFrame)
 
     if name == SpecialForms.macro.value.keyword:
+
+        #TODO implement live macro evaluation
+
         # ignore for this implementation, interpreter doesn't support eval yet
         [_, rest] = SpecialFormSlicer(currentFrame, SpecialForms.macro)
         return currentFrame.withExecutionState(rest)

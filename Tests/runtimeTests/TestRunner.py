@@ -11,7 +11,7 @@ from LispLangInterpreter.ImportHandlerSystem.LibraryClasses import Leaf
 from Tests.ParseTests.TestRunner import tokenizeParse
 
 
-def uncompiledRuntimeTest(catchErrors, config, folder, inputfile, expectedfile, testName):
+def runtimeTest(catchErrors, config, folder, inputfile, expectedfile, testName):
     if catchErrors:
         try:
             runtimeTestInternal(config, folder, inputfile, expectedfile, testName)

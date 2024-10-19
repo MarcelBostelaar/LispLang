@@ -107,8 +107,8 @@ class Leaf(Searchable):
                 if len(parsed.remaining) != 0:
                     callingStack.throwError("Could not parse lisp file " + self.absPath)
                 ast = toAST(parsed.content)
-                demacroedCode = DemacroTop(StackFrame(ast, self).withHandlerFrame(MacroHandlerFrame))
-                self.data = Eval(StackFrame(demacroedCode, self).withHandlerFrame(RuntimeHandlerFrame))
+                # demacroedCode = DemacroTop(StackFrame(ast, self).withHandlerFrame(MacroHandlerFrame))
+                self.data = Eval(StackFrame(ast, self).withHandlerFrame(RuntimeHandlerFrame))
             else:
                 sys.path.append(self.parent.absPath)
                 spec = importlib.util.spec_from_file_location("testname" + str(random.Random().random()), self.absPath)
