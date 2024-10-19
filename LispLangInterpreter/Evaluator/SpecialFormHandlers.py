@@ -1,8 +1,8 @@
 from ..Config.langConfig import SpecialForms
-from ..DataStructures.Classes import StackFrame, sExpression, StackReturnValue, UserLambda, List, HandleReturnValue, HandleBranchPoint, UserHandlerFrame
+from ..DataStructures.Classes import StackFrame, dereference, sExpression, StackReturnValue, UserLambda, List, HandleReturnValue, HandleBranchPoint, UserHandlerFrame
 from ..DataStructures.Kind import Kind
 from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
-from ..DataStructures.SupportFunctions import isIndirectionValue, dereference
+from ..DataStructures.SupportFunctions import isIndirectionValue
 from .SupportFunctions import MustBeKind, SpecialFormSlicer, QuoteCode, MustBeString
 from ..ImportHandlerSystem.CompileStatus import CompileStatus
 

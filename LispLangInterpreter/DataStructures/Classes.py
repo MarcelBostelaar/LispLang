@@ -6,14 +6,42 @@ from typing import TYPE_CHECKING
 
 from termcolor import cprint
 
+from LispLangInterpreter.DataStructures.ClassesSupportFunctions import checkReservedKeyword, escape_string
+
 from .IErrorThrowable import IErrorThrowable
 from .Kind import Kind
 from ..Config import langConfig
 from .HandlerStateRegistry import HandlerStateSingleton
-from .SupportFunctions import escape_string, checkReservedKeyword, isIndirectionValue, \
-    dereference
+from .SupportFunctions import isIndirectionValue, isSpecialFormKeyword
 if TYPE_CHECKING:
     from ..ImportHandlerSystem.LibraryClasses import Searchable
+
+
+#Put this here because of circular imports, python is shit
+def dereference(currentFrame: StackFrame) -> Value:
+    """Retrieves the real value, resolving any indirection"""
+    if not isIndirectionValue(currentFrame.executionState):
+        currentFrame.throwError("Cannot dereference this value, its not an indirected value.")
+    item = currentFrame.executionState
+    if item.kind == Kind.Reference:
+        if currentFrame.hasScopedRegularValue(item.value):
+            return currentFrame.retrieveScopedRegularValue(item.value)
+        if isSpecialFormKeyword(item.value):
+            currentFrame.throwError("Tried to execute special form, but item is a singular reference, "
+                                    "not in an s expression or on its own.")
+        currentFrame.throwError("Reference not found in scope")
+    if item.kind == Kind.StackReturnValue:
+        return currentFrame.getChildReturnValue()
+    if item.kind == Kind.HandleReturnValue:
+        stateValue = HandlerStateSingleton.retrieveState(item.handlerID)
+        childReturnValue = currentFrame.getChildReturnValue()
+        if childReturnValue is None:
+            raise NotImplementedError("Return unit or none")
+        returnValue = List([childReturnValue, stateValue])
+        HandlerStateSingleton.unregisterHandlerFrame(item.handlerID)
+        return returnValue
+    #All other cases, return value as is.
+    return item
 
 
 class Value:
