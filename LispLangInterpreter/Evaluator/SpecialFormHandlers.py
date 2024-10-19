@@ -174,7 +174,7 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
 
         # ignore for this implementation, interpreter doesn't support eval yet
         [_, rest] = SpecialFormSlicer(currentFrame, SpecialForms.macro)
-        return currentFrame.withExecutionState(rest)
+        return currentFrame.withExecutionState(sExpression(rest))
 
     if name == SpecialForms.let.value.keyword:
         return handleSpecialFormLet(currentFrame)
