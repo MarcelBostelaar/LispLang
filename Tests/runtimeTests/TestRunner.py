@@ -33,6 +33,7 @@ def runtimeTestInternal(config, folder, inputfile, expectedfile, testName):
     ranCode = start()
     config["mainFile"] = expectedfile
     Singletons.runtimeConfig = config
+    Singletons.debug = False
     evaluatedExpected = start()
 
     realSer = ranCode.serializeLLQ()

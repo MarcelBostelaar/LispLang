@@ -86,10 +86,10 @@ def handleSpecialFormList(currentFrame):
                 listMapped.append(i)
         else:
             if isIndirectionValue(i):
-                valueToAppend = dereference(currentFrame.withExecutionState(i))
+                valueToAppend = dereference(currentFrame.withExecutionState(i)).value
             else:
-                valueToAppend = i
-            listMapped.append(valueToAppend)
+                valueToAppend = [i]
+            listMapped += valueToAppend
 
     # if a subexpression was found and replaced, make it into a new stackframe, with parent being the updates list
     if newStackExpression is not None:
@@ -173,7 +173,7 @@ def ExecuteSpecialForm(currentFrame: StackFrame) -> StackFrame:
         #As of yet, the calling scope is unable to be used, but it is a good idea to keep it for future use, such as with a "subeval" function that takes a custom scope
         [[_, macroname, callingScope_alias, input_ast_alias, macroFuncBody], rest] = SpecialFormSlicer(currentFrame, SpecialForms.macro)
         #current scope is the scope the macro is defined in, only those values are available to the macro
-        macroLambda = UserLambda([callingScope_alias, input_ast_alias], macroFuncBody, currentFrame.currentScope)
+        macroLambda = UserLambda([callingScope_alias.value, input_ast_alias.value], macroFuncBody, currentFrame.currentScope)
         return currentFrame.addScopedMacroValue(macroname.value, macroLambda).withExecutionState(sExpression(rest))
 
     if name == SpecialForms.let.value.keyword:

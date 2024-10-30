@@ -25,14 +25,17 @@ def dereference(currentFrame: StackFrame) -> Value:
     item = currentFrame.executionState
     if item.kind == Kind.Reference:
         if currentFrame.hasScopedRegularValue(item.value):
-            return currentFrame.retrieveScopedRegularValue(item.value)
+            return List([currentFrame.retrieveScopedRegularValue(item.value)])
         if currentFrame.hasScopedMacroValue(item.value):
-            return MacroReference(item.value)
+            return List([MacroReference(item.value)])
         if isSpecialFormKeyword(item.value):
             currentFrame.throwError("Tried to execute special form, but item is a singular reference, "
                                     "not in an s expression or on its own.")
         currentFrame.throwError("Reference not found in scope")
     if item.kind == Kind.StackReturnValue:
+        return List([currentFrame.getChildReturnValue()])
+    if item.kind == Kind.MacroReturnValue:
+        #macros are expanded in place, and are a list, no packed in an extra list
         return currentFrame.getChildReturnValue()
     if item.kind == Kind.HandleReturnValue:
         stateValue = HandlerStateSingleton.retrieveState(item.handlerID)
@@ -41,9 +44,9 @@ def dereference(currentFrame: StackFrame) -> Value:
             raise NotImplementedError("Return unit or none")
         returnValue = List([childReturnValue, stateValue])
         HandlerStateSingleton.unregisterHandlerFrame(item.handlerID)
-        return returnValue
-    #All other cases, return value as is.
-    return item
+        return List([returnValue])
+    #All other cases, return value as is (with extra list wrap to fascilitate macro unboxing).
+    return List([item])
 
 
 class Value:
@@ -324,20 +327,20 @@ class UserLambda(Lambda):
 
     def __init__(self, bindings, body, boundScope: Scope, bindIndex=0):
         super().__init__()
-        self.__bindings__ = bindings  # function arguments
-        self.__body__ = body  # the code to execute
+        self.bindingNames = bindings  # function arguments
+        self.body = body  # the code to execute
         # Contains its own scope, equal to the scope captured at creation
-        self.__boundScope__ = boundScope
-        self.__bindIndex__ = bindIndex  # index of the arg that will bind next
+        self.boundScope = boundScope
+        self.bindIndex = bindIndex  # index of the arg that will bind next
 
     def __bindIsFinished__(self):
-        return self.__bindIndex__ >= len(self.__bindings__)
+        return self.bindIndex >= len(self.bindingNames)
 
     def bind(self, valueToBind, callingFrame: StackFrame) -> UserLambda:
         if self.__bindIsFinished__():
             callingFrame.throwError("Tried to bind fully bound lambda. Engine error.")
-        bound = self.__boundScope__.addScopedRegularValue(callingFrame, self.__bindings__[self.__bindIndex__], valueToBind)
-        return UserLambda(self.__bindings__, self.__body__, bound, bindIndex=self.__bindIndex__ + 1)
+        bound = self.boundScope.addScopedRegularValue(callingFrame, self.bindingNames[self.bindIndex], valueToBind)
+        return UserLambda(self.bindingNames, self.body, bound, bindIndex=self.bindIndex + 1)
 
     def canRun(self) -> bool:
         return self.__bindIsFinished__()
@@ -345,8 +348,8 @@ class UserLambda(Lambda):
     def createEvaluationFrame(self, callingFrame) -> StackFrame:
         if not self.canRun():
             callingFrame.throwError("Tried to run a lambda that still needs arguments bound. Engine error.")
-        newFrame = callingFrame.createChild(self.__body__)
-        newFrame.currentScope = self.__boundScope__
+        newFrame = callingFrame.createChild(self.body)
+        newFrame.currentScope = self.boundScope
         return newFrame
 
     def equals(self, other):
@@ -470,16 +473,16 @@ class Scope(Value):
     """
     def __init__(self, currentFile: Searchable):
         super().__init__(None, Kind.Scope)
-        self.__scopedNames__ = {}
-        self.__scopedValues__ = {}
+        self.scopedNames = {}
+        self.scopedValues = {}
         self.currentFile = currentFile
 
     def hasScopedRegularValue(self, name):
         # Do not check parents, because parent can be a non-captured outer scope
         if name == langConfig.currentScopeKeyword:
             return True
-        if name in self.__scopedNames__.keys():
-            return self.__scopedNames__[name] == VarType.Regular
+        if name in self.scopedNames.keys():
+            return self.scopedNames[name] == VarType.Regular
         return False
 
     def retrieveScopedRegularValue(self, callingFrame: StackFrame, name: str) -> Value:
@@ -487,18 +490,18 @@ class Scope(Value):
         if name == langConfig.currentScopeKeyword:
             return self
         if not self.hasScopedRegularValue(name):
-            if name not in self.__scopedNames__.keys():
+            if name not in self.scopedNames.keys():
                 callingFrame.throwError("Tried to retrieve regular value " + name + ". Value was not found in scope.")
             else:
                 callingFrame.throwError("Tried to retrieve regular value " + name +
-                                        ". This value is a " + self.__scopedNames__[
+                                        ". This value is a " + self.scopedNames[
                                             name].name + " value, not a regular value.")
-        return self.__scopedValues__[name]
+        return self.scopedValues[name]
 
     def hasScopedMacroValue(self, name):
         # Do not check parents, because parent can be a non-captured outer scope
-        if name in self.__scopedNames__.keys():
-            if self.__scopedNames__[name] == VarType.Macro:
+        if name in self.scopedNames.keys():
+            if self.scopedNames[name] == VarType.Macro:
                 return True
         return False
 
@@ -506,26 +509,26 @@ class Scope(Value):
         # Do not check parents, because parent can be a non-captured outer scope
         if not self.hasScopedMacroValue(name):
             callingFrame.throwError("Tried to retrieve macro '" + name + "'. Macro not found in scope.")
-        return self.__scopedValues__[name]
+        return self.scopedValues[name]
 
     def addScopedMacroValue(self, callingFrame: StackFrame, name, value) -> Scope:
         checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
-        copy.__scopedNames__[name] = VarType.Macro
-        copy.__scopedValues__[name] = value
+        copy.scopedNames[name] = VarType.Macro
+        copy.scopedValues[name] = value
         return copy
 
     def addScopedRegularValue(self, callingFrame: StackFrame, name, value) -> Scope:
         checkReservedKeyword(callingFrame, name)
         copy = self.__copy__()
-        copy.__scopedNames__[name] = VarType.Regular
-        copy.__scopedValues__[name] = value
+        copy.scopedNames[name] = VarType.Regular
+        copy.scopedValues[name] = value
         return copy
 
     def __copy__(self) -> Scope:
         copy = Scope(self.currentFile)
-        copy.__scopedNames__ = self.__scopedNames__
-        copy.__scopedValues__ = self.__scopedValues__
+        copy.scopedNames = self.scopedNames
+        copy.scopedValues = self.scopedValues
         return copy
 
     def errorDumpSerialize(self):
@@ -670,7 +673,7 @@ class MacroReturnValue(Value):
         raise "Cannot call equals on a stack return value (running code), engine error"
 
     def errorDumpSerialize(self):
-        return "StackReturnValue"
+        return "MacroReturnValue"
 
 
 class StackFrame(IErrorThrowable):
@@ -747,17 +750,17 @@ class StackFrame(IErrorThrowable):
             #binding current scope and ast available to macro to the body of the macro
             macroLambda = macroLambda\
                 .bind(self.currentScope, self)\
-                .bind(self.executionState.value[itemIndex + 1:], self)
+                .bind(List(self.executionState.value[itemIndex + 1:]), self)
             #add macro return value, then append macro lambda as child
             oldFrame = self.withExecutionState(sExpression(
                 self.executionState.value[:itemIndex] + [MacroReturnValue()]
             ))
-            return oldFrame.createChild(macroLambda)
+            return macroLambda.createEvaluationFrame(oldFrame)
             
         # its indirection
         trueValue = dereference(self.withExecutionState(item))
         return self.withExecutionState(sExpression(
-            self.executionState.value[:itemIndex] + [trueValue] + self.executionState.value[itemIndex + 1:]
+            self.executionState.value[:itemIndex] + trueValue.value + self.executionState.value[itemIndex + 1:]
         ))
 
     #Scope logic

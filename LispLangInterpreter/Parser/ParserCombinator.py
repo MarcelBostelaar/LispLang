@@ -29,14 +29,14 @@ class Combinator:
         self.debugMessage = debugMessage
 
     def parse(self, tokens):
-        if self.debugMessage is None and False: #TODO REMOVE and FALSE
+        if self.debugMessage is None:
             return self.f(tokens)
         else:
             try:
                 breakpoint = 10
                 result = self.f(tokens)
                 writeLineLog(self.debugMessage)
-                if result.isSucces or True: #TODO REMOVE OR TRUE
+                if result.isSucces: 
                     if result.content is not None:
                         if str(result.content) != "[]":
                             writeLineLog("Success, parsed:")

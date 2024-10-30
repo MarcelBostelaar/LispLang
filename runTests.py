@@ -35,7 +35,7 @@ runtimeTest(False, testConfig, "Tests/runtimeTests", "sumtest2real", "sumtest2ex
 runtimeTest(False, testConfig, "Tests/runtimeTests", "listEvaluationReal", "listEvaluationExpected", "List evaluation test")
 runtimeTest(False, testConfig, "Tests/runtimeTests", "handleTest1Real", "handleTest1Expected", "Handle test")
 
-Singletons.debug = True
+# Singletons.debug = True
 runtimeTest(False, testConfig, "Tests/runtimeTests", "macroIdentityReal", "macroIdentityExpected", "Identity macro test")
 # runtimeTest(False, testConfig, "Tests/runtimeTests", "handleTest1Real", "handleTest1Expected", "Handle test")
 

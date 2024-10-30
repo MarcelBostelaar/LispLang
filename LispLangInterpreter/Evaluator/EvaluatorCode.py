@@ -84,13 +84,15 @@ def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
     if currentFrame.executionState.kind == Kind.HandleBranchPoint:
         return EvalHandleTopLevelValueHandleBranchPoint(currentFrame)
     elif isIndirectionValue(currentFrame.executionState):
-        resultValue = dereference(currentFrame)
+        resultValue = dereference(currentFrame).value
     else:
-        resultValue = currentFrame.executionState
+        resultValue = [currentFrame.executionState]
 
-    if currentFrame.parent is None:
-        return True, resultValue
-    return False, currentFrame.parent.withChildReturnValue(resultValue)
+    if len(resultValue) == 1 and currentFrame.parent is None:
+        return True, resultValue[0]
+    if len(resultValue) == 1:
+        return False, currentFrame.parent.withChildReturnValue(resultValue[0])
+    return False, currentFrame.parent.withChildReturnValue(sExpression(resultValue[0]))
 
 
 def non_looping_eval(currentFrame: StackFrame) -> Value:
