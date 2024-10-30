@@ -86,7 +86,7 @@ def handleSpecialFormList(currentFrame):
                 listMapped.append(i)
         else:
             if isIndirectionValue(i):
-                valueToAppend = dereference(currentFrame.withExecutionState(i)).value
+                valueToAppend = dereference(currentFrame.withExecutionState(i))
             else:
                 valueToAppend = [i]
             listMapped += valueToAppend

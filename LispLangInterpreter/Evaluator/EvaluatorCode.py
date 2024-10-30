@@ -1,6 +1,6 @@
 from LispLangInterpreter.Config import Singletons
 from ..DataStructures.Classes import dereference, sExpression, StackFrame, Value, \
-    StackReturnValue, Lambda, HandleBranchPoint, ContinueStop
+    StackReturnValue, Lambda, HandleBranchPoint, ContinueStop, subevaluateMacro
 from ..DataStructures.Kind import Kind
 from ..DataStructures.HandlerStateRegistry import HandlerStateSingleton
 from .SpecialFormHandlers import ExecuteSpecialForm
@@ -40,7 +40,7 @@ def handleReferenceAtHead(currentFrame: StackFrame) -> StackFrame:
         expression = sExpression([head] + tail)
         return currentFrame.withExecutionState(expression)
     if currentFrame.hasScopedMacroValue(head.value):
-        currentFrame.throwError("Macro that isnt compiled out found")
+        return subevaluateMacro(currentFrame, 0)
     if isSpecialFormKeyword(head.value):
         return ExecuteSpecialForm(currentFrame)
 
@@ -83,24 +83,23 @@ def EvalHandleTopLevelValue(currentFrame: StackFrame) -> (bool, any):
     """
     if currentFrame.executionState.kind == Kind.HandleBranchPoint:
         return EvalHandleTopLevelValueHandleBranchPoint(currentFrame)
-    elif isIndirectionValue(currentFrame.executionState):
-        resultValue = dereference(currentFrame).value
-    else:
-        resultValue = [currentFrame.executionState]
-
-    if len(resultValue) == 1 and currentFrame.parent is None:
-        return True, resultValue[0]
-    if len(resultValue) == 1:
-        return False, currentFrame.parent.withChildReturnValue(resultValue[0])
-    return False, currentFrame.parent.withChildReturnValue(sExpression(resultValue[0]))
+    if isIndirectionValue(currentFrame.executionState):
+        #retrieve value and substitute it
+        resultValue = dereference(currentFrame)
+        return False, currentFrame.withExecutionState(sExpression(resultValue))
+    
+    if currentFrame.parent is None:
+        return True, currentFrame.executionState
+    return False, currentFrame.parent.withChildReturnValue(currentFrame.executionState)
 
 
 def non_looping_eval(currentFrame: StackFrame) -> Value:
     """
     Evaluates one step of a piece of interpreter representational code
     """
+    Singletons.debugCounter += 1
     if Singletons.debug:
-        print("----\n")
+        print(str(Singletons.debugCounter) + "----\n")
         currentFrame.__stackTrace__()
     if currentFrame.executionState.kind != Kind.sExpression:
         program_finished, returnValue = EvalHandleTopLevelValue(currentFrame)
@@ -137,6 +136,7 @@ def Eval(currentFrame: StackFrame) -> Value:
     Evaluates a piece of interpreter representational code
     """
     # continue statements used to achieve tail call optimisation, and to keep stack usage to a minimum
+    Singletons.debugCounter = 0
     program_finished = False
     while not program_finished:
         program_finished, currentFrame = non_looping_eval(currentFrame)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import copy as makeCopy
 import functools
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -25,18 +26,21 @@ def dereference(currentFrame: StackFrame) -> Value:
     item = currentFrame.executionState
     if item.kind == Kind.Reference:
         if currentFrame.hasScopedRegularValue(item.value):
-            return List([currentFrame.retrieveScopedRegularValue(item.value)])
+            return [currentFrame.retrieveScopedRegularValue(item.value)]
         if currentFrame.hasScopedMacroValue(item.value):
-            return List([MacroReference(item.value)])
+            return [MacroReference(item.value)]
         if isSpecialFormKeyword(item.value):
             currentFrame.throwError("Tried to execute special form, but item is a singular reference, "
                                     "not in an s expression or on its own.")
         currentFrame.throwError("Reference not found in scope")
     if item.kind == Kind.StackReturnValue:
-        return List([currentFrame.getChildReturnValue()])
+        return [currentFrame.getChildReturnValue()]
     if item.kind == Kind.MacroReturnValue:
-        #macros are expanded in place, and are a list, no packed in an extra list
-        return currentFrame.getChildReturnValue()
+        #macros are expanded in place, and must always be a list
+        childreturn = currentFrame.getChildReturnValue()
+        if childreturn.kind != Kind.List:
+            raise Exception("Macros must always return a list! Returned a " + childreturn.kind + " instead.")
+        return childreturn.value
     if item.kind == Kind.HandleReturnValue:
         stateValue = HandlerStateSingleton.retrieveState(item.handlerID)
         childReturnValue = currentFrame.getChildReturnValue()
@@ -44,9 +48,9 @@ def dereference(currentFrame: StackFrame) -> Value:
             raise NotImplementedError("Return unit or none")
         returnValue = List([childReturnValue, stateValue])
         HandlerStateSingleton.unregisterHandlerFrame(item.handlerID)
-        return List([returnValue])
+        return [returnValue]
     #All other cases, return value as is (with extra list wrap to fascilitate macro unboxing).
-    return List([item])
+    return [item]
 
 
 class Value:
@@ -55,18 +59,28 @@ class Value:
     def __init__(self, value, kind: Kind):
         self.value = value
         self.kind = kind
+        self.dereferencedName = ""
 
     def serializeLLQ(self):
         raise Exception("Cannot serialise a " + self.kind.name)
 
     def errorDumpSerialize(self):
-        raise NotImplementedError("Not implemented equality for this class")
+        if self.dereferencedName == "":
+            return self.serializeLLQ()
+        return self.serializeLLQ() + "<" + self.dereferencedName + ">"
 
     def isSerializable(self):
         return False
 
     def equals(self, other):
         raise NotImplementedError("Not implemented equality for this class")
+    
+    """Sets a name for debugging purposes, sets it when value is retrieved"""
+    def setDereferencedName(self, newName):
+        copy = makeCopy(self)
+        copy.dereferencedName = newName
+        return copy
+
 
 #Code literals
 
@@ -125,9 +139,6 @@ class QuotedName(Value):
     def serializeLLQ(self):
         return self.value
 
-    def errorDumpSerialize(self):
-        return self.serializeLLQ()
-
     def isSerializable(self):
         return True
 
@@ -143,9 +154,6 @@ class Char(Value):
 
     def serializeLLQ(self):
         return 'c"' + escape_string(self.value) + '"'
-
-    def errorDumpSerialize(self):
-        return self.serializeLLQ()
 
     def isSerializable(self):
         return True
@@ -173,9 +181,6 @@ class ContinueStop(Value):
     def serializeLLQ(self):
         self.__unRun__().serializeLLQ()
 
-    def errorDumpSerialize(self):
-        self.__unRun__().errorDumpSerialize()
-
     def equals(self, other):
         if other.kind == self.kind:
             if other.isContinue == self.isContinue:
@@ -201,9 +206,6 @@ class Boolean(Value):
             return "true"
         return "false"
 
-    def errorDumpSerialize(self):
-        return self.serializeLLQ()
-
     def isSerializable(self):
         return True
 
@@ -224,9 +226,6 @@ class Number(Value):
     def serializeLLQ(self):
         return str(self.value)
 
-    def errorDumpSerialize(self):
-        return self.serializeLLQ()
-
     def isSerializable(self):
         return True
 
@@ -242,9 +241,6 @@ class Unit(Value):
 
     def serializeLLQ(self):
         return langConfig.unitKeyword
-
-    def errorDumpSerialize(self):
-        return self.serializeLLQ()
 
     def isSerializable(self):
         return True
@@ -294,7 +290,9 @@ class MacroReference(Value):
         raise "Cannot call equals on a reference value (running code), engine error" #TODO why?
 
     def errorDumpSerialize(self):
-        return "*M*" + self.value
+        if self.dereferencedName == "":
+            return "*M*" + self.value
+        return "*M*" + self.value + "<" + self.dereferencedName + ">"
 
 #function representations
 
@@ -325,13 +323,14 @@ class Lambda(Value):
 class UserLambda(Lambda):
     """In memory representation of a function"""
 
-    def __init__(self, bindings, body, boundScope: Scope, bindIndex=0):
+    def __init__(self, bindings, body, boundScope: Scope, bindIndex=0, dereferencedName = ""):
         super().__init__()
         self.bindingNames = bindings  # function arguments
         self.body = body  # the code to execute
         # Contains its own scope, equal to the scope captured at creation
         self.boundScope = boundScope
         self.bindIndex = bindIndex  # index of the arg that will bind next
+        self.dereferencedName = dereferencedName
 
     def __bindIsFinished__(self):
         return self.bindIndex >= len(self.bindingNames)
@@ -340,7 +339,7 @@ class UserLambda(Lambda):
         if self.__bindIsFinished__():
             callingFrame.throwError("Tried to bind fully bound lambda. Engine error.")
         bound = self.boundScope.addScopedRegularValue(callingFrame, self.bindingNames[self.bindIndex], valueToBind)
-        return UserLambda(self.bindingNames, self.body, bound, bindIndex=self.bindIndex + 1)
+        return UserLambda(self.bindingNames, self.body, bound, bindIndex=self.bindIndex + 1, dereferencedName=self.dereferencedName)
 
     def canRun(self) -> bool:
         return self.__bindIsFinished__()
@@ -356,16 +355,20 @@ class UserLambda(Lambda):
         return super(UserLambda, self).equals(other)
 
     def errorDumpSerialize(self):
-        return "UserLambda"
+        i = "UserLambda"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
 
 class SystemFunction(Lambda):
     """In memory representation of a system function"""
 
-    def __init__(self, function, bindingsLeft):
+    def __init__(self, function, bindingsLeft, dereferencedName = ""):
         super().__init__()
         self.function = function
         self.bindingsLeft = bindingsLeft
+        self.dereferencedName = dereferencedName
 
     def equals(self, other):
         super(SystemFunction, self).equals(other)
@@ -381,27 +384,31 @@ class SystemFunction(Lambda):
     def bind(self, argument, callingFrame):
         if self.bindingsLeft <= 0:
             callingFrame.throwError("Tried to bind to a fully bound system function")
-        return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1)
+        return SystemFunction(functools.partial(self.function, argument), self.bindingsLeft - 1, self.dereferencedName)
 
     def errorDumpSerialize(self):
-        return f"SystemFunction"
+        i = "SystemFunction"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
 
 class UnfinishedHandlerInvocation(Lambda):
     """In memory representation of an unfinished handler invocation,
     acts akin to a type definition for an effectfull function."""
-    def __init__(self, name: str, argAmount: int):
+    def __init__(self, name: str, argAmount: int, dereferencedName = ""):
         super().__init__()
         self.name = name
         """The handler name it references"""
         self.argAmount = argAmount
         """Total amount of args needed for invocation"""
         self.args = []
+        self.dereferencedName
 
     def bind(self, argument, callingFrame: StackFrame) -> UnfinishedHandlerInvocation:
         if self.canRun():
             callingFrame.throwError(f"Too many arguments added to the unfinished handler invocation '{self.name}'")
-        copy = UnfinishedHandlerInvocation(self.name, self.argAmount)
+        copy = UnfinishedHandlerInvocation(self.name, self.argAmount, self.dereferencedName)
         copy.args.append(argument)
         return copy
 
@@ -419,7 +426,10 @@ class UnfinishedHandlerInvocation(Lambda):
         return callingFrame.invokeHandler(self.name, self.args)
 
     def errorDumpSerialize(self):
-        return f"UnfinishedHandlerInvocation<{self.name}, with: {', '.join([x.errorDumpSerialize() for x in self.args])}>"
+        i = f"UnfinishedHandlerInvocation<{self.name}, with: {', '.join([x.errorDumpSerialize() for x in self.args])}>"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
     def equals(self, other):
         raise NotImplementedError("")
@@ -434,7 +444,10 @@ class HandleReturnValue(Value):
         self.handlerID = handlerID
 
     def errorDumpSerialize(self):
-        return f"HandleReturnValue<{self.handlerID}>"
+        i = f"HandleReturnValue<{self.handlerID}>"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
     def equals(self, other):
         raise NotImplementedError("")
@@ -447,14 +460,17 @@ class HandleBranchPoint(Value):
         self.handlerID = handlerID
 
     def errorDumpSerialize(self):
+        addon = ""
+        if self.dereferencedName != "":
+            addon = "<" + self.dereferencedName + ">"
         if self.continueBranch is not None:
             return f"\n" \
                    f"HandleBranchPoint with continue branch. Continue branch:" +\
-                   self.continueBranch.errorDumpSerialize() +\
+                   self.continueBranch.errorDumpSerialize() + addon +\
                    f"\n"
         else:
             return f"\n" \
-                   f"HandleBranchPoint without continue branch." \
+                   f"HandleBranchPoint without continue branch." + addon +\
                    f"\n"
 
 
@@ -496,7 +512,7 @@ class Scope(Value):
                 callingFrame.throwError("Tried to retrieve regular value " + name +
                                         ". This value is a " + self.scopedNames[
                                             name].name + " value, not a regular value.")
-        return self.scopedValues[name]
+        return self.scopedValues[name].setDereferencedName(name)
 
     def hasScopedMacroValue(self, name):
         # Do not check parents, because parent can be a non-captured outer scope
@@ -509,7 +525,7 @@ class Scope(Value):
         # Do not check parents, because parent can be a non-captured outer scope
         if not self.hasScopedMacroValue(name):
             callingFrame.throwError("Tried to retrieve macro '" + name + "'. Macro not found in scope.")
-        return self.scopedValues[name]
+        return self.scopedValues[name].setDereferencedName(name)
 
     def addScopedMacroValue(self, callingFrame: StackFrame, name, value) -> Scope:
         checkReservedKeyword(callingFrame, name)
@@ -532,7 +548,10 @@ class Scope(Value):
         return copy
 
     def errorDumpSerialize(self):
-        return "<Captured scope>"
+        i = "[Captured scope]"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
     def equals(self, other):
         raise NotImplementedError("")
@@ -580,7 +599,10 @@ class SystemHandlerFrame(HandlerFrame):
         return boundFunc.createEvaluationFrame(callingFrame)
 
     def errorDumpSerialize(self):
-        return f"SystemHandlerFrame<{', '.join(self.handlerFunctions.keys())}>"
+        i = f"SystemHandlerFrame[<]{', '.join(self.handlerFunctions.keys())}]"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
     def equals(self, other):
         raise NotImplementedError()
@@ -644,7 +666,10 @@ class UserHandlerFrame(HandlerFrame):
         return handleFuncRunningFrame
 
     def errorDumpSerialize(self):
-        return "<Captured handler frame>"
+        i = "[Captured handler frame]"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
     def equals(self, other):
         raise NotImplementedError()
@@ -663,7 +688,10 @@ class StackReturnValue(Value):
         raise "Cannot call equals on a stack return value (running code), engine error"
 
     def errorDumpSerialize(self):
-        return "StackReturnValue"
+        i = "StackReturnValue"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
 class MacroReturnValue(Value):
     def __init__(self):
@@ -673,8 +701,26 @@ class MacroReturnValue(Value):
         raise "Cannot call equals on a stack return value (running code), engine error"
 
     def errorDumpSerialize(self):
-        return "MacroReturnValue"
+        i = "MacroReturnValue"
+        if self.dereferencedName == "":
+            return i
+        return i + "<" + self.dereferencedName + ">"
 
+
+def subevaluateMacro(currentFrame: StackFrame, itemIndex):
+    item = currentFrame.executionState.value[itemIndex]
+    #subevaluate macro with all the code from itemindex forward
+    #retrieving lambda
+    macroLambda = currentFrame.retrieveScopedMacroValue(item.value)
+    #binding current scope and ast available to macro to the body of the macro
+    macroLambda = macroLambda\
+        .bind(currentFrame.currentScope, currentFrame)\
+        .bind(List(currentFrame.executionState.value[itemIndex + 1:]), currentFrame)
+    #add macro return value, then append macro lambda as child
+    oldFrame = currentFrame.withExecutionState(sExpression(
+        currentFrame.executionState.value[:itemIndex] + [MacroReturnValue()]
+    ))
+    return macroLambda.createEvaluationFrame(oldFrame)
 
 class StackFrame(IErrorThrowable):
     """A frame in the stack that contains the scoped names, values and handlers, as well as a link to its parent"""
@@ -687,14 +733,14 @@ class StackFrame(IErrorThrowable):
         self.closestHandlerFrame = None
         """Handler stack is seperate, code stack only keeps track of which stack is reachable to it. 
         Other interactions are done through the evaluator code."""
-        self.__childReturnValue__ = None
+        self.childReturnValue = None
         self.currentScope = Scope(currentFile)
 
     def __copy__(self) -> StackFrame:
         newcopy = StackFrame(self.executionState, self.currentScope.currentFile)
         newcopy.currentScope = self.currentScope.__copy__()
         newcopy.closestHandlerFrame = self.closestHandlerFrame
-        newcopy.__childReturnValue__ = self.__childReturnValue__
+        newcopy.childReturnValue = self.childReturnValue
         newcopy.parent = self.parent
         return newcopy
 
@@ -744,35 +790,24 @@ class StackFrame(IErrorThrowable):
             return newStack
 
         if item.kind == Kind.MacroReference:
-            #subevaluate macro with all the code from itemindex forward
-            #retrieving lambda
-            macroLambda = self.retrieveScopedMacroValue(item.value)
-            #binding current scope and ast available to macro to the body of the macro
-            macroLambda = macroLambda\
-                .bind(self.currentScope, self)\
-                .bind(List(self.executionState.value[itemIndex + 1:]), self)
-            #add macro return value, then append macro lambda as child
-            oldFrame = self.withExecutionState(sExpression(
-                self.executionState.value[:itemIndex] + [MacroReturnValue()]
-            ))
-            return macroLambda.createEvaluationFrame(oldFrame)
+            return subevaluateMacro(self, itemIndex)
             
         # its indirection
         trueValue = dereference(self.withExecutionState(item))
         return self.withExecutionState(sExpression(
-            self.executionState.value[:itemIndex] + trueValue.value + self.executionState.value[itemIndex + 1:]
+            self.executionState.value[:itemIndex] + trueValue + self.executionState.value[itemIndex + 1:]
         ))
 
     #Scope logic
 
     def getChildReturnValue(self):
-        if self.__childReturnValue__ is None:
+        if self.childReturnValue is None:
             self.throwError("No child to return found. Engine bug")
-        return self.__childReturnValue__
+        return self.childReturnValue
 
     def withChildReturnValue(self, value):
         copy = self.__copy__()
-        copy.__childReturnValue__ = value
+        copy.childReturnValue = value
         return copy
 
     def hasScopedRegularValue(self, name):

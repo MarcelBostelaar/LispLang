@@ -1,5 +1,5 @@
 __import [list ["PythonFuncs" "head"]] [quote head]
-//__import PythonFuncs.tail
+__import [list ["PythonFuncs" "tail"]] [quote tail]
 __import [list ["PythonFuncs" "concat"]] [quote concat]
 //__import PythonFuncs.equals
 __import [list ["PythonFuncs" "sum"]] [quote sum]
@@ -11,6 +11,7 @@ __import [list ["PythonFuncs" "handlerInvocationDefinition"]] [quote handlerInvo
 //__import PythonFuncs.genSym
 list [ 
     [list ["head" head]] 
+    [list ["tail" tail]] 
     [list ["concat" concat]]  
     [list ["sum" sum]]  
     [list ["handlerInvocationDefinition" handlerInvocationDefinition]] 

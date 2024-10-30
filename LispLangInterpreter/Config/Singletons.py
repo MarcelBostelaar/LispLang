@@ -5,6 +5,7 @@ MacroHandlerFrame = None
 RuntimeHandlerFrame = None
 
 debug = False
+debugCounter = 0
 
 consolePrint = False
 textPrint = False
