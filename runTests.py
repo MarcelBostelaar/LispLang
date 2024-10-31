@@ -37,6 +37,3 @@ runtimeTest(False, testConfig, "Tests/runtimeTests", "handleTest1Real", "handleT
 
 runtimeTest(False, testConfig, "Tests/runtimeTests", "macroIdentityReal", "macroIdentityExpected", "Identity macro test")
 runtimeTest(False, testConfig, "Tests/runtimeTests", "macroASTShuffleReal", "macroASTShuffleExpected", "Identity ast shuffle test")
-
-# compileTest("CompileTests/simple macro real.lisp", "CompileTests/simple macro expected.lisp", "Simplest demacro Tests")
-# compileTest("CompileTests/macroTailReal.lisp", "CompileTests/macroTailExpected.lisp", "Macro tail Tests")

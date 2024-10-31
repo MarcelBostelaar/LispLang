@@ -8,11 +8,10 @@ from os.path import basename
 from typing import List
 
 from LispLangInterpreter.Config import langConfig
-from LispLangInterpreter.Config.Singletons import MacroHandlerFrame, RuntimeHandlerFrame
+from LispLangInterpreter.Config.Singletons import RuntimeHandlerFrame
 from LispLangInterpreter.DataStructures.Classes import StackFrame, Value
 from LispLangInterpreter.DataStructures.IErrorThrowable import IErrorThrowable
 from LispLangInterpreter.Evaluator.EvaluatorCode import Eval
-from LispLangInterpreter.Evaluator.MacroExpand import DemacroTop
 from LispLangInterpreter.Evaluator.SupportFunctions import toAST, makeDictFromReturn
 from LispLangInterpreter.ImportHandlerSystem.CompileStatus import CompileStatus
 from LispLangInterpreter.Parser.ParserCode import parseAll
